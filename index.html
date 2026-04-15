@@ -58,6 +58,14 @@
               顯示格線
             </label>
 
+            <div class="control-group">
+              <label for="gridSize">格線大小</label>
+              <div class="range-row">
+                <input id="gridSize" type="range" min="20" max="300" step="10" value="100" />
+                <output id="gridSizeValue" for="gridSize">100 px</output>
+              </div>
+            </div>
+
             <div class="selection-status">
               <span>切片數量</span>
               <strong id="sliceCount">1</strong>
@@ -101,7 +109,7 @@
           </div>
         </aside>
 
-        <section class="canvas-panel" aria-label="圖片編輯區">
+        <section id="canvasPanel" class="canvas-panel" aria-label="圖片編輯區">
           <div id="dropZone" class="drop-zone">
             <canvas id="imageCanvas" aria-label="圖片畫布"></canvas>
             <div id="emptyState" class="empty-state">

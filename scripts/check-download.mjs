@@ -34,6 +34,16 @@ try {
 
   await page.locator("#cellSize").fill("40");
 
+  const workspaceRatio = await page.locator("#dropZone").evaluate((dropZone) => {
+    const bounds = dropZone.getBoundingClientRect();
+    return bounds.width / bounds.height;
+  });
+  const expectedRatio = 160 / 120;
+
+  if (Math.abs(workspaceRatio - expectedRatio) > 0.02) {
+    throw new Error(`Expected workspace ratio ${expectedRatio}, received ${workspaceRatio}.`);
+  }
+
   const viewport = await page.locator("#imageCanvas").evaluate((canvas) => {
     const bounds = canvas.getBoundingClientRect();
     const scale = Math.min(bounds.width / 160, bounds.height / 120);
@@ -77,6 +87,7 @@ try {
   await download.saveAs(outputPath);
 
   await page.click("#sliceTab");
+  await page.locator("#gridSize").fill("40");
   await page.click("#addVerticalLineButton");
   await clickImagePoint(page, viewport, { x: 55, y: 60 });
   await clickImagePoint(page, viewport, { x: 105, y: 60 });

@@ -271,7 +271,7 @@ output {
 .drop-zone.has-image {
   height: auto;
   min-height: 0;
-  max-height: calc(100vh - 116px - 36px);
+  max-width: 100%;
   margin: 0 auto;
 }
 

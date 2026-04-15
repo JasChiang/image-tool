@@ -4,6 +4,7 @@ import type { EditorTool } from "../tools/editorTool";
 
 type EditorElements = {
   canvas: HTMLCanvasElement;
+  canvasPanel: HTMLElement;
   dropZone: HTMLElement;
   emptyState: HTMLElement;
   mosaicTab: HTMLButtonElement;
@@ -18,6 +19,8 @@ type EditorElements = {
   workspaceSizeValue: HTMLOutputElement;
   selectionCount: HTMLElement;
   showGrid: HTMLInputElement;
+  gridSize: HTMLInputElement;
+  gridSizeValue: HTMLOutputElement;
   sliceCount: HTMLElement;
   verticalLineCount: HTMLElement;
   horizontalLineCount: HTMLElement;
@@ -99,7 +102,15 @@ export function createEditorController(elements: EditorElements): void {
         drawSelection(context, draftSelection, viewport);
       }
     } else if (elements.showGrid.checked) {
-      drawSliceGrid(context, bitmap, viewport, verticalLines, horizontalLines, pendingCutLine);
+      drawSliceGrid(
+        context,
+        bitmap,
+        viewport,
+        verticalLines,
+        horizontalLines,
+        pendingCutLine,
+        Number(elements.gridSize.value)
+      );
     }
 
     updateControls();
@@ -128,6 +139,7 @@ export function createEditorController(elements: EditorElements): void {
     elements.clearCutLinesButton.disabled = !hasCutLines;
     elements.downloadSlicesButton.disabled = !hasImage || !hasCutLines;
     elements.cellSizeValue.value = `${elements.cellSize.value} px`;
+    elements.gridSizeValue.value = `${elements.gridSize.value} px`;
     elements.workspaceSizeValue.value = `${elements.workspaceSize.value}%`;
     elements.selectionCount.textContent = String(selections.length);
     elements.verticalLineCount.textContent = String(verticalLines.length);
@@ -241,6 +253,10 @@ export function createEditorController(elements: EditorElements): void {
   });
 
   elements.cellSize.addEventListener("input", updateControls);
+  elements.gridSize.addEventListener("input", () => {
+    elements.gridSizeValue.value = `${elements.gridSize.value} px`;
+    render();
+  });
   elements.workspaceSize.addEventListener("input", () => {
     elements.workspaceSizeValue.value = `${elements.workspaceSize.value}%`;
     render();
@@ -351,16 +367,36 @@ export function createEditorController(elements: EditorElements): void {
   render();
 
   function updateWorkspaceFrame(bitmap: ImageBitmap | null): void {
-    elements.dropZone.style.width = `${elements.workspaceSize.value}%`;
-
     if (!bitmap) {
       elements.dropZone.classList.remove("has-image");
       elements.dropZone.style.removeProperty("aspect-ratio");
+      elements.dropZone.style.removeProperty("width");
+      elements.dropZone.style.removeProperty("height");
       return;
     }
 
+    const panelBounds = elements.canvasPanel.getBoundingClientRect();
+    const panelStyle = window.getComputedStyle(elements.canvasPanel);
+    const horizontalPadding =
+      Number.parseFloat(panelStyle.paddingLeft) + Number.parseFloat(panelStyle.paddingRight);
+    const verticalPadding =
+      Number.parseFloat(panelStyle.paddingTop) + Number.parseFloat(panelStyle.paddingBottom);
+    const availableWidth = Math.max(240, panelBounds.width - horizontalPadding);
+    const availableHeight = Math.max(
+      240,
+      window.innerHeight - panelBounds.top - verticalPadding - 18
+    );
+    const sizeRatio = Number(elements.workspaceSize.value) / 100;
+    const maxWidth = availableWidth * sizeRatio;
+    const maxHeight = availableHeight * sizeRatio;
+    const imageRatio = bitmap.width / bitmap.height;
+    const frameWidth = Math.min(maxWidth, maxHeight * imageRatio);
+    const frameHeight = frameWidth / imageRatio;
+
     elements.dropZone.classList.add("has-image");
     elements.dropZone.style.aspectRatio = `${bitmap.width} / ${bitmap.height}`;
+    elements.dropZone.style.width = `${Math.round(frameWidth)}px`;
+    elements.dropZone.style.height = `${Math.round(frameHeight)}px`;
   }
 
   function addPendingCutLine(point: Point, bitmap: ImageBitmap): void {
@@ -491,7 +527,8 @@ function drawSliceGrid(
   viewport: Viewport,
   verticalLines: number[],
   horizontalLines: number[],
-  pendingCutLine: PendingCutLine
+  pendingCutLine: PendingCutLine,
+  gridSize: number
 ): void {
   const x = viewport.offsetX;
   const y = viewport.offsetY;
@@ -499,7 +536,7 @@ function drawSliceGrid(
   const height = bitmap.height * viewport.scale;
 
   context.save();
-  drawGuideGrid(context, bitmap, viewport);
+  drawGuideGrid(context, bitmap, viewport, gridSize);
 
   context.strokeStyle = "rgba(15, 23, 42, 0.62)";
   context.lineWidth = 1;
@@ -541,20 +578,21 @@ function drawSliceGrid(
 function drawGuideGrid(
   context: CanvasRenderingContext2D,
   bitmap: ImageBitmap,
-  viewport: Viewport
+  viewport: Viewport,
+  gridSize: number
 ): void {
   const x = viewport.offsetX;
   const y = viewport.offsetY;
   const width = bitmap.width * viewport.scale;
   const height = bitmap.height * viewport.scale;
-  const gridSize = getGridSize(bitmap);
+  const safeGridSize = clamp(Math.round(gridSize), 10, Math.max(bitmap.width, bitmap.height));
 
   context.save();
   context.strokeStyle = "rgba(15, 23, 42, 0.22)";
   context.lineWidth = 1;
   context.setLineDash([]);
 
-  for (let lineX = gridSize; lineX < bitmap.width; lineX += gridSize) {
+  for (let lineX = safeGridSize; lineX < bitmap.width; lineX += safeGridSize) {
     const canvasX = x + lineX * viewport.scale;
     context.beginPath();
     context.moveTo(canvasX, y);
@@ -562,7 +600,7 @@ function drawGuideGrid(
     context.stroke();
   }
 
-  for (let lineY = gridSize; lineY < bitmap.height; lineY += gridSize) {
+  for (let lineY = safeGridSize; lineY < bitmap.height; lineY += safeGridSize) {
     const canvasY = y + lineY * viewport.scale;
     context.beginPath();
     context.moveTo(x, canvasY);
@@ -571,20 +609,6 @@ function drawGuideGrid(
   }
 
   context.restore();
-}
-
-function getGridSize(bitmap: ImageBitmap): number {
-  const longestSide = Math.max(bitmap.width, bitmap.height);
-
-  if (longestSide <= 500) {
-    return 50;
-  }
-
-  if (longestSide <= 1200) {
-    return 100;
-  }
-
-  return 200;
 }
 
 function drawLineLabel(

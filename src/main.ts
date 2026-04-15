@@ -5,6 +5,7 @@ import { mosaicTool } from "./tools/mosaicTool";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#imageCanvas");
 const fileInput = document.querySelector<HTMLInputElement>("#fileInput");
+const canvasPanel = document.querySelector<HTMLElement>("#canvasPanel");
 const dropZone = document.querySelector<HTMLElement>("#dropZone");
 const emptyState = document.querySelector<HTMLElement>("#emptyState");
 const mosaicTab = document.querySelector<HTMLButtonElement>("#mosaicTab");
@@ -18,6 +19,8 @@ const workspaceSize = document.querySelector<HTMLInputElement>("#workspaceSize")
 const workspaceSizeValue = document.querySelector<HTMLOutputElement>("#workspaceSizeValue");
 const selectionCount = document.querySelector<HTMLElement>("#selectionCount");
 const showGrid = document.querySelector<HTMLInputElement>("#showGrid");
+const gridSize = document.querySelector<HTMLInputElement>("#gridSize");
+const gridSizeValue = document.querySelector<HTMLOutputElement>("#gridSizeValue");
 const sliceCount = document.querySelector<HTMLElement>("#sliceCount");
 const verticalLineCount = document.querySelector<HTMLElement>("#verticalLineCount");
 const horizontalLineCount = document.querySelector<HTMLElement>("#horizontalLineCount");
@@ -35,6 +38,7 @@ const downloadSlicesButton = document.querySelector<HTMLButtonElement>("#downloa
 if (
   !canvas ||
   !fileInput ||
+  !canvasPanel ||
   !dropZone ||
   !emptyState ||
   !mosaicTab ||
@@ -48,6 +52,8 @@ if (
   !workspaceSizeValue ||
   !selectionCount ||
   !showGrid ||
+  !gridSize ||
+  !gridSizeValue ||
   !sliceCount ||
   !verticalLineCount ||
   !horizontalLineCount ||
@@ -69,6 +75,7 @@ const documentState = new ImageDocument();
 
 createEditorController({
   canvas,
+  canvasPanel,
   dropZone,
   emptyState,
   mosaicTab,
@@ -83,6 +90,8 @@ createEditorController({
   workspaceSizeValue,
   selectionCount,
   showGrid,
+  gridSize,
+  gridSizeValue,
   sliceCount,
   verticalLineCount,
   horizontalLineCount,
