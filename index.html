@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>圖片馬賽克工具</title>
+  </head>
+  <body>
+    <main id="app" class="app-shell">
+      <section class="toolbar" aria-label="圖片工具列">
+        <div>
+          <p class="eyebrow">Local image editor</p>
+          <h1>圖片馬賽克工具</h1>
+        </div>
+
+        <label class="file-button">
+          <input id="fileInput" type="file" accept="image/*" />
+          選擇圖片
+        </label>
+      </section>
+
+      <section class="workspace">
+        <aside class="controls" aria-label="馬賽克設定">
+          <div class="control-group">
+            <label for="cellSize">馬賽克格子</label>
+            <div class="range-row">
+              <input id="cellSize" type="range" min="4" max="80" value="18" />
+              <output id="cellSizeValue" for="cellSize">18 px</output>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <label for="exportName">下載檔名</label>
+            <input id="exportName" type="text" value="mosaic-image.png" />
+          </div>
+
+          <div class="selection-status">
+            <span>已選取區域</span>
+            <strong id="selectionCount">0</strong>
+          </div>
+
+          <div class="action-grid">
+            <button id="applyButton" type="button" disabled>套用全部馬賽克</button>
+            <button id="clearSelectionButton" type="button" disabled>清除選取</button>
+            <button id="undoButton" type="button" disabled>復原</button>
+            <button id="resetButton" type="button" disabled>重置圖片</button>
+            <button id="downloadButton" type="button" disabled>下載 PNG</button>
+          </div>
+
+          <div class="tips">
+            <p>可以連續拖曳多個區域，再一次套用馬賽克。</p>
+            <p>所有處理都在瀏覽器本機完成。</p>
+          </div>
+        </aside>
+
+        <section class="canvas-panel" aria-label="圖片編輯區">
+          <div id="dropZone" class="drop-zone">
+            <canvas id="imageCanvas" aria-label="圖片畫布"></canvas>
+            <div id="emptyState" class="empty-state">
+              <div class="sample-image" aria-hidden="true"></div>
+              <h2>把圖片拖到這裡</h2>
+              <p>支援 JPG、PNG、WebP。載入後用滑鼠或觸控框選要處理的區域。</p>
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
