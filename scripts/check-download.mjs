@@ -78,13 +78,15 @@ try {
 
   await page.click("#sliceTab");
   await page.click("#addVerticalLineButton");
-  await clickImagePoint(page, viewport, { x: 80, y: 60 });
+  await clickImagePoint(page, viewport, { x: 55, y: 60 });
+  await clickImagePoint(page, viewport, { x: 105, y: 60 });
   await page.click("#addHorizontalLineButton");
   await clickImagePoint(page, viewport, { x: 80, y: 60 });
+  await clickImagePoint(page, viewport, { x: 80, y: 90 });
 
   const sliceCount = await page.locator("#sliceCount").textContent();
-  if (sliceCount !== "4") {
-    throw new Error(`Expected four slices, received ${sliceCount}.`);
+  if (sliceCount !== "9") {
+    throw new Error(`Expected nine slices, received ${sliceCount}.`);
   }
 
   const [slicesDownload] = await Promise.all([
@@ -121,7 +123,7 @@ if (zipSignature !== "504b0304") {
 }
 
 const zipText = slices.toString("latin1");
-["slice-r1-c1.png", "slice-r1-c2.png", "slice-r2-c1.png", "slice-r2-c2.png"].forEach((name) => {
+["slice-r1-c1.png", "slice-r1-c3.png", "slice-r3-c1.png", "slice-r3-c3.png"].forEach((name) => {
   if (!zipText.includes(name)) {
     throw new Error(`Downloaded ZIP is missing ${name}.`);
   }

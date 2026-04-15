@@ -14,6 +14,8 @@ type EditorElements = {
   cellSize: HTMLInputElement;
   cellSizeValue: HTMLOutputElement;
   exportName: HTMLInputElement;
+  workspaceSize: HTMLInputElement;
+  workspaceSizeValue: HTMLOutputElement;
   selectionCount: HTMLElement;
   showGrid: HTMLInputElement;
   sliceCount: HTMLElement;
@@ -61,6 +63,7 @@ export function createEditorController(elements: EditorElements): void {
 
   const render = () => {
     const bitmap = elements.documentState.bitmap;
+    updateWorkspaceFrame(bitmap);
     const bounds = elements.dropZone.getBoundingClientRect();
     const density = window.devicePixelRatio || 1;
 
@@ -119,10 +122,13 @@ export function createEditorController(elements: EditorElements): void {
     elements.downloadButton.disabled = !hasImage;
     elements.addVerticalLineButton.disabled = !hasImage;
     elements.addHorizontalLineButton.disabled = !hasImage;
+    elements.addVerticalLineButton.classList.toggle("is-active", pendingCutLine === "vertical");
+    elements.addHorizontalLineButton.classList.toggle("is-active", pendingCutLine === "horizontal");
     elements.undoCutLineButton.disabled = !hasCutLines;
     elements.clearCutLinesButton.disabled = !hasCutLines;
     elements.downloadSlicesButton.disabled = !hasImage || !hasCutLines;
     elements.cellSizeValue.value = `${elements.cellSize.value} px`;
+    elements.workspaceSizeValue.value = `${elements.workspaceSize.value}%`;
     elements.selectionCount.textContent = String(selections.length);
     elements.verticalLineCount.textContent = String(verticalLines.length);
     elements.horizontalLineCount.textContent = String(horizontalLines.length);
@@ -235,6 +241,10 @@ export function createEditorController(elements: EditorElements): void {
   });
 
   elements.cellSize.addEventListener("input", updateControls);
+  elements.workspaceSize.addEventListener("input", () => {
+    elements.workspaceSizeValue.value = `${elements.workspaceSize.value}%`;
+    render();
+  });
   elements.showGrid.addEventListener("change", render);
 
   elements.addVerticalLineButton.addEventListener("click", () => {
@@ -260,7 +270,6 @@ export function createEditorController(elements: EditorElements): void {
       horizontalLines = horizontalLines.filter((line) => line !== last.value);
     }
 
-    pendingCutLine = null;
     render();
   });
 
@@ -341,12 +350,24 @@ export function createEditorController(elements: EditorElements): void {
   window.addEventListener("resize", render);
   render();
 
+  function updateWorkspaceFrame(bitmap: ImageBitmap | null): void {
+    elements.dropZone.style.width = `${elements.workspaceSize.value}%`;
+
+    if (!bitmap) {
+      elements.dropZone.classList.remove("has-image");
+      elements.dropZone.style.removeProperty("aspect-ratio");
+      return;
+    }
+
+    elements.dropZone.classList.add("has-image");
+    elements.dropZone.style.aspectRatio = `${bitmap.width} / ${bitmap.height}`;
+  }
+
   function addPendingCutLine(point: Point, bitmap: ImageBitmap): void {
     if (pendingCutLine === "vertical") {
       const x = Math.round(clamp(point.x, 1, bitmap.width - 1));
       verticalLines = addUniqueLine(verticalLines, x);
       cutHistory = [...cutHistory, { direction: "vertical", value: x }];
-      pendingCutLine = null;
       render();
       return;
     }
@@ -355,7 +376,6 @@ export function createEditorController(elements: EditorElements): void {
       const y = Math.round(clamp(point.y, 1, bitmap.height - 1));
       horizontalLines = addUniqueLine(horizontalLines, y);
       cutHistory = [...cutHistory, { direction: "horizontal", value: y }];
-      pendingCutLine = null;
       render();
     }
   }
@@ -479,6 +499,8 @@ function drawSliceGrid(
   const height = bitmap.height * viewport.scale;
 
   context.save();
+  drawGuideGrid(context, bitmap, viewport);
+
   context.strokeStyle = "rgba(15, 23, 42, 0.62)";
   context.lineWidth = 1;
   context.setLineDash([4, 5]);
@@ -514,6 +536,55 @@ function drawSliceGrid(
   }
 
   context.restore();
+}
+
+function drawGuideGrid(
+  context: CanvasRenderingContext2D,
+  bitmap: ImageBitmap,
+  viewport: Viewport
+): void {
+  const x = viewport.offsetX;
+  const y = viewport.offsetY;
+  const width = bitmap.width * viewport.scale;
+  const height = bitmap.height * viewport.scale;
+  const gridSize = getGridSize(bitmap);
+
+  context.save();
+  context.strokeStyle = "rgba(15, 23, 42, 0.22)";
+  context.lineWidth = 1;
+  context.setLineDash([]);
+
+  for (let lineX = gridSize; lineX < bitmap.width; lineX += gridSize) {
+    const canvasX = x + lineX * viewport.scale;
+    context.beginPath();
+    context.moveTo(canvasX, y);
+    context.lineTo(canvasX, y + height);
+    context.stroke();
+  }
+
+  for (let lineY = gridSize; lineY < bitmap.height; lineY += gridSize) {
+    const canvasY = y + lineY * viewport.scale;
+    context.beginPath();
+    context.moveTo(x, canvasY);
+    context.lineTo(x + width, canvasY);
+    context.stroke();
+  }
+
+  context.restore();
+}
+
+function getGridSize(bitmap: ImageBitmap): number {
+  const longestSide = Math.max(bitmap.width, bitmap.height);
+
+  if (longestSide <= 500) {
+    return 50;
+  }
+
+  if (longestSide <= 1200) {
+    return 100;
+  }
+
+  return 200;
 }
 
 function drawLineLabel(

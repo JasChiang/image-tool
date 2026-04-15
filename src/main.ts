@@ -14,6 +14,8 @@ const slicePanel = document.querySelector<HTMLElement>("#slicePanel");
 const cellSize = document.querySelector<HTMLInputElement>("#cellSize");
 const cellSizeValue = document.querySelector<HTMLOutputElement>("#cellSizeValue");
 const exportName = document.querySelector<HTMLInputElement>("#exportName");
+const workspaceSize = document.querySelector<HTMLInputElement>("#workspaceSize");
+const workspaceSizeValue = document.querySelector<HTMLOutputElement>("#workspaceSizeValue");
 const selectionCount = document.querySelector<HTMLElement>("#selectionCount");
 const showGrid = document.querySelector<HTMLInputElement>("#showGrid");
 const sliceCount = document.querySelector<HTMLElement>("#sliceCount");
@@ -42,6 +44,8 @@ if (
   !cellSize ||
   !cellSizeValue ||
   !exportName ||
+  !workspaceSize ||
+  !workspaceSizeValue ||
   !selectionCount ||
   !showGrid ||
   !sliceCount ||
@@ -75,6 +79,8 @@ createEditorController({
   cellSize,
   cellSizeValue,
   exportName,
+  workspaceSize,
+  workspaceSizeValue,
   selectionCount,
   showGrid,
   sliceCount,
