@@ -129,6 +129,31 @@ output {
   font-variant-numeric: tabular-nums;
 }
 
+.tool-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.tab-button {
+  background: #ffffff;
+  color: #1f2937;
+}
+
+.tab-button.is-active {
+  background: #1f2937;
+  color: #ffffff;
+}
+
+.tool-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.tool-panel[hidden] {
+  display: none;
+}
+
 .action-grid {
   display: grid;
   gap: 10px;
@@ -153,6 +178,37 @@ output {
   color: #ffffff;
   text-align: center;
   font-variant-numeric: tabular-nums;
+}
+
+.cut-status {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.cut-status span {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 10px;
+  background: #ffffff;
+  color: #475569;
+}
+
+.cut-status strong {
+  color: #1d2430;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+}
+
+.checkbox-row input {
+  width: 18px;
+  height: 18px;
+  accent-color: #0f766e;
 }
 
 .action-grid button:nth-child(2),

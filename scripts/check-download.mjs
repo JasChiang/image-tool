@@ -4,9 +4,10 @@ import path from "node:path";
 import zlib from "node:zlib";
 
 const chromePath = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-const testDir = "/tmp/mosaic-tool-download-test";
+const testDir = "/tmp/image-tool-download-test";
 const inputPath = path.join(testDir, "input.png");
 const outputPath = path.join(testDir, "output.png");
+const slicesPath = path.join(testDir, "slices.zip");
 
 await fs.mkdir(testDir, { recursive: true });
 await fs.writeFile(inputPath, createPng(160, 120));
@@ -69,6 +70,24 @@ try {
   ]);
 
   await download.saveAs(outputPath);
+
+  await page.click("#sliceTab");
+  await page.click("#addVerticalLineButton");
+  await clickImagePoint(page, viewport, { x: 80, y: 60 });
+  await page.click("#addHorizontalLineButton");
+  await clickImagePoint(page, viewport, { x: 80, y: 60 });
+
+  const sliceCount = await page.locator("#sliceCount").textContent();
+  if (sliceCount !== "4") {
+    throw new Error(`Expected four slices, received ${sliceCount}.`);
+  }
+
+  const [slicesDownload] = await Promise.all([
+    page.waitForEvent("download"),
+    page.click("#downloadSlicesButton")
+  ]);
+
+  await slicesDownload.saveAs(slicesPath);
 } finally {
   await browser.close();
 }
@@ -85,7 +104,21 @@ if (output.byteLength < 500) {
   throw new Error(`Downloaded PNG is unexpectedly small: ${output.byteLength} bytes.`);
 }
 
+const slices = await fs.readFile(slicesPath);
+const zipSignature = slices.subarray(0, 4).toString("hex");
+if (zipSignature !== "504b0304") {
+  throw new Error(`Downloaded slices file is not a ZIP. Signature: ${zipSignature}`);
+}
+
+const zipText = slices.toString("latin1");
+["slice-r1-c1.png", "slice-r1-c2.png", "slice-r2-c1.png", "slice-r2-c2.png"].forEach((name) => {
+  if (!zipText.includes(name)) {
+    throw new Error(`Downloaded ZIP is missing ${name}.`);
+  }
+});
+
 console.log(`Download OK: ${outputPath} (${output.byteLength} bytes)`);
+console.log(`Slices ZIP OK: ${slicesPath} (${slices.byteLength} bytes)`);
 
 function createPng(width, height) {
   const rawRows = [];
@@ -156,6 +189,10 @@ async function dragImageRect(page, viewport, start, end) {
     steps: 8
   });
   await page.mouse.up();
+}
+
+async function clickImagePoint(page, viewport, point) {
+  await page.mouse.click(imageToClientX(viewport, point.x), imageToClientY(viewport, point.y));
 }
 
 async function sampleCanvasPixel(page, viewport, point) {
