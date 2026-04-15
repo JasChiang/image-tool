@@ -2,6 +2,8 @@
 
 一個純前端的圖片處理工具。圖片只會在瀏覽器本機處理，不會上傳到伺服器。
 
+GitHub Pages: https://jaschiang.github.io/image-tool/
+
 ## 功能
 
 - 上傳或拖放圖片

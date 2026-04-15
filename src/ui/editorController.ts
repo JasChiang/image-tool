@@ -135,6 +135,7 @@ export function createEditorController(elements: EditorElements): void {
     }
 
     await elements.documentState.load(file);
+    elements.exportName.value = getDefaultExportName(file.name);
     selections = [];
     draftSelection = null;
     clearCutLines();
@@ -535,6 +536,18 @@ function drawLineLabel(
 function getExportName(value: string): string {
   const name = value.trim() || "mosaic-image.png";
   return name.toLowerCase().endsWith(".png") ? name : `${name}.png`;
+}
+
+function getDefaultExportName(fileName: string): string {
+  const fallback = "image.png";
+  const trimmed = fileName.trim();
+
+  if (!trimmed) {
+    return fallback;
+  }
+
+  const baseName = trimmed.replace(/\.[^/.]+$/, "");
+  return `${baseName || "image"}.png`;
 }
 
 function getZipName(value: string): string {

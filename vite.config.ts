@@ -5,6 +5,7 @@ const noStoreHeaders = {
 };
 
 export default defineConfig({
+  base: process.env.GITHUB_ACTIONS ? "/image-tool/" : "/",
   server: {
     headers: noStoreHeaders
   },

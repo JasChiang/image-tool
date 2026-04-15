@@ -27,6 +27,11 @@ try {
     return emptyState instanceof HTMLElement && emptyState.hidden;
   });
 
+  const defaultExportName = await page.locator("#exportName").inputValue();
+  if (defaultExportName !== "input.png") {
+    throw new Error(`Expected export name to default to input.png, received ${defaultExportName}.`);
+  }
+
   await page.locator("#cellSize").fill("40");
 
   const viewport = await page.locator("#imageCanvas").evaluate((canvas) => {
@@ -86,6 +91,11 @@ try {
     page.waitForEvent("download"),
     page.click("#downloadSlicesButton")
   ]);
+
+  const suggestedSlicesName = slicesDownload.suggestedFilename();
+  if (suggestedSlicesName !== "input-slices.zip") {
+    throw new Error(`Expected slices filename input-slices.zip, received ${suggestedSlicesName}.`);
+  }
 
   await slicesDownload.saveAs(slicesPath);
 } finally {
