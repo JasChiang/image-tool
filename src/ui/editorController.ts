@@ -64,6 +64,12 @@ export function createEditorController(elements: EditorElements): void {
   let cutHistory: Array<{ direction: Exclude<PendingCutLine, null>; value: number }> = [];
   let viewport: Viewport = { scale: 1, offsetX: 0, offsetY: 0 };
 
+  const reportError = (error: unknown, fallbackMessage: string) => {
+    console.error(error);
+    const message = error instanceof Error ? error.message : fallbackMessage;
+    window.alert(message);
+  };
+
   const render = () => {
     const bitmap = elements.documentState.bitmap;
     updateWorkspaceFrame(bitmap);
@@ -119,6 +125,7 @@ export function createEditorController(elements: EditorElements): void {
   const updateControls = () => {
     const hasImage = elements.documentState.hasImage;
     const hasSelection = selections.length > 0;
+    const hasDraftSelection = draftSelection !== null;
     const hasCutLines = verticalLines.length + horizontalLines.length > 0;
 
     elements.emptyState.hidden = hasImage;
@@ -128,7 +135,8 @@ export function createEditorController(elements: EditorElements): void {
     elements.slicePanel.hidden = mode !== "slice";
     elements.applyButton.disabled = !hasImage || !hasSelection;
     elements.clearSelectionButton.disabled = !hasSelection;
-    elements.undoButton.disabled = !elements.documentState.canUndo;
+    elements.undoButton.disabled =
+      !hasImage || (!elements.documentState.canUndo && !hasSelection && !hasDraftSelection);
     elements.resetButton.disabled = !hasImage;
     elements.downloadButton.disabled = !hasImage;
     elements.addVerticalLineButton.disabled = !hasImage;
@@ -152,12 +160,16 @@ export function createEditorController(elements: EditorElements): void {
       return;
     }
 
-    await elements.documentState.load(file);
-    elements.exportName.value = getDefaultExportName(file.name);
-    selections = [];
-    draftSelection = null;
-    clearCutLines();
-    render();
+    try {
+      await elements.documentState.load(file);
+      elements.exportName.value = getDefaultExportName(file.name);
+      selections = [];
+      draftSelection = null;
+      clearCutLines();
+      render();
+    } catch (error) {
+      reportError(error, "圖片載入失敗，請重新選擇檔案。");
+    }
   };
 
   elements.mosaicTab.addEventListener("click", () => {
@@ -180,6 +192,8 @@ export function createEditorController(elements: EditorElements): void {
     if (file) {
       await loadFile(file);
     }
+
+    elements.fileInput.value = "";
   });
 
   elements.dropZone.addEventListener("dragover", (event) => {
@@ -312,14 +326,18 @@ export function createEditorController(elements: EditorElements): void {
       return;
     }
 
-    const result = await applyToolToRegions(elements.activeTool, bitmap, selections, {
-      cellSize: Number(elements.cellSize.value)
-    });
+    try {
+      const result = await applyToolToRegions(elements.activeTool, bitmap, selections, {
+        cellSize: Number(elements.cellSize.value)
+      });
 
-    await elements.documentState.replaceWith(result);
-    selections = [];
-    draftSelection = null;
-    render();
+      await elements.documentState.replaceWith(result);
+      selections = [];
+      draftSelection = null;
+      render();
+    } catch (error) {
+      reportError(error, "套用馬賽克失敗，請重新整理後再試一次。");
+    }
   });
 
   elements.clearSelectionButton.addEventListener("click", () => {
@@ -329,17 +347,32 @@ export function createEditorController(elements: EditorElements): void {
   });
 
   elements.undoButton.addEventListener("click", () => {
+    if (draftSelection) {
+      draftSelection = null;
+      dragStart = null;
+      render();
+      return;
+    }
+
+    if (selections.length > 0) {
+      selections = selections.slice(0, -1);
+      render();
+      return;
+    }
+
     elements.documentState.undo();
-    selections = [];
-    draftSelection = null;
     render();
   });
 
   elements.resetButton.addEventListener("click", async () => {
-    await elements.documentState.reset();
-    selections = [];
-    draftSelection = null;
-    render();
+    try {
+      await elements.documentState.reset();
+      selections = [];
+      draftSelection = null;
+      render();
+    } catch (error) {
+      reportError(error, "重置圖片失敗，請重新載入圖片。");
+    }
   });
 
   elements.downloadButton.addEventListener("click", async () => {
@@ -358,9 +391,13 @@ export function createEditorController(elements: EditorElements): void {
       return;
     }
 
-    exportContext.drawImage(bitmap, 0, 0);
-    const blob = await canvasToBlob(exportCanvas);
-    downloadBlob(blob, getExportName(elements.exportName.value));
+    try {
+      exportContext.drawImage(bitmap, 0, 0);
+      const blob = await canvasToBlob(exportCanvas);
+      downloadBlob(blob, getExportName(elements.exportName.value));
+    } catch (error) {
+      reportError(error, "下載圖片失敗，請稍後再試。");
+    }
   });
 
   window.addEventListener("resize", render);
