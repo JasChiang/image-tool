@@ -11,28 +11,44 @@
         <div>
           <p class="eyebrow">Local image editor</p>
           <h1>圖片工具</h1>
+          <p class="toolbar-copy">純前端、多圖處理、可直接部署在 GitHub Pages。</p>
         </div>
 
-        <label class="file-button">
-          <input id="fileInput" type="file" accept="image/*" />
-          選擇圖片
-        </label>
+        <div class="toolbar-actions">
+          <label class="file-button">
+            <input id="fileInput" type="file" accept="image/*" multiple />
+            新增圖片
+          </label>
+        </div>
       </section>
 
       <section class="workspace">
         <aside class="controls" aria-label="圖片工具設定">
           <div class="tool-tabs" role="tablist" aria-label="功能分頁">
-            <button id="mosaicTab" class="tab-button is-active" type="button">馬賽克</button>
+            <button id="editTab" class="tab-button is-active" type="button">編輯</button>
             <button id="sliceTab" class="tab-button" type="button">切版</button>
           </div>
 
-          <section id="mosaicPanel" class="tool-panel">
+          <section id="editPanel" class="tool-panel">
+            <div class="tool-choices" role="tablist" aria-label="遮蔽效果">
+              <button id="mosaicToolButton" class="mini-tab is-active" type="button">馬賽克</button>
+              <button id="blurToolButton" class="mini-tab" type="button">模糊</button>
+              <button id="blackoutToolButton" class="mini-tab" type="button">黑條</button>
+              <button id="coverToolButton" class="mini-tab" type="button">純色</button>
+            </div>
+
             <div class="control-group">
-              <label for="cellSize">馬賽克格子</label>
+              <label id="effectStrengthLabel" for="cellSize">馬賽克格子</label>
               <div class="range-row">
                 <input id="cellSize" type="range" min="4" max="80" value="18" />
                 <output id="cellSizeValue" for="cellSize">18 px</output>
               </div>
+              <p id="effectHint" class="helper-text">拖曳多個區域後，一次套用像素化遮蔽。</p>
+            </div>
+
+            <div id="coverColorGroup" class="control-group" hidden>
+              <label for="coverColor">遮蓋顏色</label>
+              <input id="coverColor" type="color" value="#111827" />
             </div>
 
             <div class="selection-status">
@@ -42,13 +58,45 @@
 
             <div class="action-grid">
               <button id="applyButton" type="button" disabled>套用全部馬賽克</button>
-              <button id="clearSelectionButton" type="button" disabled>清除選取</button>
-              <button id="undoButton" type="button" disabled>復原</button>
-              <button id="resetButton" type="button" disabled>重置圖片</button>
+              <button id="removeLastSelectionButton" type="button" disabled>刪除最後一個</button>
+              <button id="clearSelectionButton" type="button" disabled>清除全部選取</button>
             </div>
 
-            <div class="tips">
-              <p>可以連續拖曳多個區域，再一次套用馬賽克。</p>
+            <div class="selection-list-panel">
+              <div class="section-heading">
+                <span>選區清單</span>
+                <span id="selectionSummary">尚未建立選區</span>
+              </div>
+              <div id="selectionList" class="selection-list" aria-live="polite">
+                <p class="selection-list-empty">拖曳畫面建立第一個選區。</p>
+              </div>
+            </div>
+
+            <div class="control-group">
+              <label class="checkbox-row">
+                <input id="compareToggle" type="checkbox" />
+                顯示原圖比較
+              </label>
+            </div>
+
+            <div class="section-block">
+              <div class="section-heading">
+                <span>圖片整理</span>
+                <span>用最後一個選區裁切</span>
+              </div>
+              <div class="action-grid transform-grid">
+                <button id="cropButton" type="button" disabled>裁成最後選區</button>
+                <button id="rotateLeftButton" type="button" disabled>左轉 90°</button>
+                <button id="rotateRightButton" type="button" disabled>右轉 90°</button>
+                <button id="flipHorizontalButton" type="button" disabled>水平翻轉</button>
+                <button id="flipVerticalButton" type="button" disabled>垂直翻轉</button>
+              </div>
+            </div>
+
+            <div class="action-grid history-grid">
+              <button id="undoButton" type="button" disabled>復原</button>
+              <button id="redoButton" type="button" disabled>重做</button>
+              <button id="resetButton" type="button" disabled>重置圖片</button>
             </div>
           </section>
 
@@ -89,35 +137,71 @@
             </div>
           </section>
 
-          <div class="control-group">
-            <label for="exportName">下載檔名</label>
-            <input id="exportName" type="text" value="mosaic-image.png" />
-          </div>
-
-          <div class="control-group">
-            <label for="workspaceSize">工作區大小</label>
-            <div class="range-row">
-              <input id="workspaceSize" type="range" min="45" max="100" value="100" />
-              <output id="workspaceSizeValue" for="workspaceSize">100%</output>
+          <section class="section-block export-panel">
+            <div class="section-heading">
+              <span>輸出</span>
+              <span id="processingStatus">所有處理都在本機瀏覽器完成，不會上傳圖片。</span>
             </div>
-          </div>
 
-          <button id="downloadButton" type="button" disabled>下載目前圖片 PNG</button>
+            <div class="control-group">
+              <label for="exportName">下載檔名</label>
+              <input id="exportName" type="text" value="image" />
+            </div>
 
-          <div class="tips">
-            <p>所有處理都在瀏覽器本機完成。</p>
-          </div>
+            <div class="control-group">
+              <label for="exportFormat">輸出格式</label>
+              <select id="exportFormat">
+                <option value="png">PNG</option>
+                <option value="jpeg">JPEG</option>
+                <option value="webp">WebP</option>
+              </select>
+            </div>
+
+            <div class="control-group">
+              <label for="exportQuality">品質</label>
+              <div class="range-row">
+                <input id="exportQuality" type="range" min="40" max="100" value="92" />
+                <output id="exportQualityValue" for="exportQuality">92%</output>
+              </div>
+            </div>
+
+            <div class="control-group">
+              <label for="workspaceSize">工作區大小</label>
+              <div class="range-row">
+                <input id="workspaceSize" type="range" min="45" max="100" value="100" />
+                <output id="workspaceSizeValue" for="workspaceSize">100%</output>
+              </div>
+            </div>
+
+            <div class="action-grid">
+              <button id="downloadButton" type="button" disabled>下載目前圖片</button>
+              <button id="downloadAllButton" type="button" disabled>批次下載 ZIP</button>
+            </div>
+          </section>
         </aside>
 
-        <section id="canvasPanel" class="canvas-panel" aria-label="圖片編輯區">
-          <div id="dropZone" class="drop-zone">
-            <canvas id="imageCanvas" aria-label="圖片畫布"></canvas>
-            <div id="emptyState" class="empty-state">
-              <div class="sample-image" aria-hidden="true"></div>
-              <h2>把圖片拖到這裡</h2>
-              <p>支援 JPG、PNG、WebP。載入後用滑鼠或觸控框選要處理的區域。</p>
+        <section class="stage-layout" aria-label="圖片工作區">
+          <div class="stage-topbar">
+            <div>
+              <p class="stage-label">圖片清單</p>
+              <p id="activeImageMeta" class="stage-meta">尚未載入圖片</p>
             </div>
           </div>
+
+          <div id="imageList" class="image-list" aria-label="已載入圖片清單">
+            <p class="image-list-empty">可同時放入多張圖片，逐張切換編輯，再一次匯出。</p>
+          </div>
+
+          <section id="canvasPanel" class="canvas-panel" aria-label="圖片編輯區">
+            <div id="dropZone" class="drop-zone">
+              <canvas id="imageCanvas" aria-label="圖片畫布"></canvas>
+              <div id="emptyState" class="empty-state">
+                <div class="sample-image" aria-hidden="true"></div>
+                <h2>把圖片拖到這裡</h2>
+                <p>支援 JPG、PNG、WebP。新增多張後可從上方縮圖列切換，所有處理都在本機完成。</p>
+              </div>
+            </div>
+          </section>
         </section>
       </section>
     </main>
