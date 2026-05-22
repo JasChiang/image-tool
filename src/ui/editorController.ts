@@ -11,14 +11,16 @@ import {
   type Rect,
   type SelectionShape
 } from "../core/geometry";
+import { jsPDF } from "jspdf";
 import { ImageDocument } from "../core/imageDocument";
+import { canvasToFile, loadPdf, renderPdfPage } from "../core/pdfLoader";
 import { blackoutTool } from "../tools/blackoutTool";
 import { blurTool } from "../tools/blurTool";
 import { coverTool } from "../tools/coverTool";
 import { mosaicTool } from "../tools/mosaicTool";
 import type { EditorTool } from "../tools/editorTool";
 
-type ExportFormat = "png" | "jpeg" | "webp";
+type ExportFormat = "png" | "jpeg" | "webp" | "pdf";
 type EditorMode = "edit" | "slice";
 type PendingCutLine = "vertical" | "horizontal" | null;
 type ToolId = "mosaic" | "blur" | "blackout" | "cover";
@@ -568,34 +570,67 @@ export function createEditorController(elements: EditorElements): void {
       return;
     }
 
-    const incoming = Array.from(files).filter((file) => file.type.startsWith("image/"));
+    const incoming = Array.from(files).filter(
+      (file) => file.type.startsWith("image/") || file.type === "application/pdf" || /\.pdf$/i.test(file.name)
+    );
     if (incoming.length === 0) {
       return;
     }
 
-    setBusy(true, "載入圖片中...");
+    setBusy(true, "載入檔案中...");
 
     try {
       for (const file of incoming) {
-        const document = new ImageDocument();
-        await document.load(file);
+        const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
 
-        const entry: ImageEntry = {
-          id: crypto.randomUUID(),
-          name: file.name,
-          document,
-          thumbnailUrl: ""
-        };
+        if (isPdf) {
+          const pdfDoc = await loadPdf(file);
+          const baseName = getBaseName(file.name);
+          const totalPages = pdfDoc.numPages;
+          const padWidth = String(totalPages).length;
 
-        await updateThumbnail(entry);
-        images.push(entry);
-        activeImageId = entry.id;
+          for (let pageNumber = 1; pageNumber <= totalPages; pageNumber += 1) {
+            setBusy(true, `載入 PDF 第 ${pageNumber}/${totalPages} 頁...`);
+            const canvas = await renderPdfPage(pdfDoc, pageNumber);
+            const pageLabel = totalPages > 1 ? `${baseName}-p${String(pageNumber).padStart(padWidth, "0")}.png` : `${baseName}.png`;
+            const pageFile = await canvasToFile(canvas, pageLabel);
+            const document = new ImageDocument();
+            await document.load(pageFile);
+
+            const entry: ImageEntry = {
+              id: crypto.randomUUID(),
+              name: pageLabel,
+              document,
+              thumbnailUrl: ""
+            };
+
+            await updateThumbnail(entry);
+            images.push(entry);
+            activeImageId = entry.id;
+          }
+
+          await pdfDoc.destroy();
+        } else {
+          const document = new ImageDocument();
+          await document.load(file);
+
+          const entry: ImageEntry = {
+            id: crypto.randomUUID(),
+            name: file.name,
+            document,
+            thumbnailUrl: ""
+          };
+
+          await updateThumbnail(entry);
+          images.push(entry);
+          activeImageId = entry.id;
+        }
       }
 
       syncExportName();
       resetEphemeralState();
     } catch (error) {
-      reportError(error, "圖片載入失敗，請重新選擇檔案。");
+      reportError(error, "檔案載入失敗，請重新選擇檔案。");
     } finally {
       elements.fileInput.value = "";
       setBusy(false);
@@ -1478,7 +1513,19 @@ async function exportBitmap(bitmap: ImageBitmap, format: ExportFormat, quality: 
   }
 
   context.drawImage(bitmap, 0, 0);
+  if (format === "pdf") {
+    return canvasToPdfBlob(canvas, quality);
+  }
   return canvasToBlob(canvas, format, quality);
+}
+
+function canvasToPdfBlob(canvas: HTMLCanvasElement, quality: number): Blob {
+  const normalizedQuality = Math.min(1, Math.max(0.4, quality / 100));
+  const dataUrl = canvas.toDataURL("image/jpeg", normalizedQuality);
+  const orientation = canvas.width >= canvas.height ? "landscape" : "portrait";
+  const pdf = new jsPDF({ orientation, unit: "px", format: [canvas.width, canvas.height], compress: true });
+  pdf.addImage(dataUrl, "JPEG", 0, 0, canvas.width, canvas.height, undefined, "FAST");
+  return pdf.output("blob");
 }
 
 function canvasToBlob(canvas: HTMLCanvasElement, format: ExportFormat, quality: number): Promise<Blob> {
@@ -1700,7 +1747,10 @@ function getMimeType(format: ExportFormat): string {
 }
 
 function getFileExtension(format: ExportFormat): string {
-  return format === "jpeg" ? "jpg" : format;
+  if (format === "jpeg") {
+    return "jpg";
+  }
+  return format;
 }
 
 function getBaseName(fileName: string): string {
