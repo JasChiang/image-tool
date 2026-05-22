@@ -12,6 +12,15 @@ const editPanel = document.querySelector<HTMLElement>("#editPanel");
 const slicePanel = document.querySelector<HTMLElement>("#slicePanel");
 const imageList = document.querySelector<HTMLElement>("#imageList");
 const activeImageMeta = document.querySelector<HTMLElement>("#activeImageMeta");
+const rectModeButton = document.querySelector<HTMLButtonElement>("#rectModeButton");
+const brushModeButton = document.querySelector<HTMLButtonElement>("#brushModeButton");
+const polygonModeButton = document.querySelector<HTMLButtonElement>("#polygonModeButton");
+const brushSizeGroup = document.querySelector<HTMLElement>("#brushSizeGroup");
+const brushSize = document.querySelector<HTMLInputElement>("#brushSize");
+const brushSizeValue = document.querySelector<HTMLOutputElement>("#brushSizeValue");
+const polygonActions = document.querySelector<HTMLElement>("#polygonActions");
+const finishPolygonButton = document.querySelector<HTMLButtonElement>("#finishPolygonButton");
+const cancelPolygonButton = document.querySelector<HTMLButtonElement>("#cancelPolygonButton");
 const mosaicToolButton = document.querySelector<HTMLButtonElement>("#mosaicToolButton");
 const blurToolButton = document.querySelector<HTMLButtonElement>("#blurToolButton");
 const blackoutToolButton = document.querySelector<HTMLButtonElement>("#blackoutToolButton");
@@ -37,6 +46,9 @@ const rotateLeftButton = document.querySelector<HTMLButtonElement>("#rotateLeftB
 const rotateRightButton = document.querySelector<HTMLButtonElement>("#rotateRightButton");
 const flipHorizontalButton = document.querySelector<HTMLButtonElement>("#flipHorizontalButton");
 const flipVerticalButton = document.querySelector<HTMLButtonElement>("#flipVerticalButton");
+const templatePreset = document.querySelector<HTMLSelectElement>("#templatePreset");
+const applyTemplateButton = document.querySelector<HTMLButtonElement>("#applyTemplateButton");
+const applyTemplateAllButton = document.querySelector<HTMLButtonElement>("#applyTemplateAllButton");
 const showGrid = document.querySelector<HTMLInputElement>("#showGrid");
 const gridSize = document.querySelector<HTMLInputElement>("#gridSize");
 const gridSizeValue = document.querySelector<HTMLOutputElement>("#gridSizeValue");
@@ -70,6 +82,15 @@ if (
   !slicePanel ||
   !imageList ||
   !activeImageMeta ||
+  !rectModeButton ||
+  !brushModeButton ||
+  !polygonModeButton ||
+  !brushSizeGroup ||
+  !brushSize ||
+  !brushSizeValue ||
+  !polygonActions ||
+  !finishPolygonButton ||
+  !cancelPolygonButton ||
   !mosaicToolButton ||
   !blurToolButton ||
   !blackoutToolButton ||
@@ -95,6 +116,9 @@ if (
   !rotateRightButton ||
   !flipHorizontalButton ||
   !flipVerticalButton ||
+  !templatePreset ||
+  !applyTemplateButton ||
+  !applyTemplateAllButton ||
   !showGrid ||
   !gridSize ||
   !gridSizeValue ||
@@ -131,6 +155,15 @@ createEditorController({
   slicePanel,
   imageList,
   activeImageMeta,
+  rectModeButton,
+  brushModeButton,
+  polygonModeButton,
+  brushSizeGroup,
+  brushSize,
+  brushSizeValue,
+  polygonActions,
+  finishPolygonButton,
+  cancelPolygonButton,
   mosaicToolButton,
   blurToolButton,
   blackoutToolButton,
@@ -156,6 +189,9 @@ createEditorController({
   rotateRightButton,
   flipHorizontalButton,
   flipVerticalButton,
+  templatePreset,
+  applyTemplateButton,
+  applyTemplateAllButton,
   showGrid,
   gridSize,
   gridSizeValue,

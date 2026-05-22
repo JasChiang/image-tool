@@ -30,6 +30,25 @@
           </div>
 
           <section id="editPanel" class="tool-panel">
+            <div class="selection-mode-tabs" role="tablist" aria-label="選取模式">
+              <button id="rectModeButton" class="mini-tab is-active" type="button">矩形</button>
+              <button id="brushModeButton" class="mini-tab" type="button">筆刷</button>
+              <button id="polygonModeButton" class="mini-tab" type="button">多邊形</button>
+            </div>
+
+            <div id="brushSizeGroup" class="control-group" hidden>
+              <label for="brushSize">筆刷大小</label>
+              <div class="range-row">
+                <input id="brushSize" type="range" min="6" max="48" value="18" />
+                <output id="brushSizeValue" for="brushSize">18 px</output>
+              </div>
+            </div>
+
+            <div id="polygonActions" class="action-grid" hidden>
+              <button id="finishPolygonButton" type="button" disabled>完成多邊形</button>
+              <button id="cancelPolygonButton" type="button" disabled>取消多邊形</button>
+            </div>
+
             <div class="tool-choices" role="tablist" aria-label="遮蔽效果">
               <button id="mosaicToolButton" class="mini-tab is-active" type="button">馬賽克</button>
               <button id="blurToolButton" class="mini-tab" type="button">模糊</button>
@@ -90,6 +109,27 @@
                 <button id="rotateRightButton" type="button" disabled>右轉 90°</button>
                 <button id="flipHorizontalButton" type="button" disabled>水平翻轉</button>
                 <button id="flipVerticalButton" type="button" disabled>垂直翻轉</button>
+              </div>
+            </div>
+
+            <div class="section-block">
+              <div class="section-heading">
+                <span>社群尺寸模板</span>
+                <span>可套用到目前圖片或全部圖片</span>
+              </div>
+              <div class="control-group">
+                <label for="templatePreset">模板</label>
+                <select id="templatePreset">
+                  <option value="instagram-square">Instagram 正方形 1080×1080</option>
+                  <option value="instagram-story">Instagram 限時動態 1080×1920</option>
+                  <option value="youtube-thumbnail">YouTube 縮圖 1280×720</option>
+                  <option value="xiaohongshu-vertical">小紅書直式 1242×1660</option>
+                  <option value="shop-banner">電商橫幅 1600×900</option>
+                </select>
+              </div>
+              <div class="action-grid">
+                <button id="applyTemplateButton" type="button" disabled>套用到目前圖片</button>
+                <button id="applyTemplateAllButton" type="button" disabled>批次套用全部圖片</button>
               </div>
             </div>
 

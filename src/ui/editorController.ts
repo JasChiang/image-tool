@@ -1,4 +1,16 @@
-import { clampRect, normalizeRect, rectHasArea, type Point, type Rect } from "../core/geometry";
+import {
+  clampRect,
+  drawSelectionShape,
+  getSelectionBounds,
+  getSelectionDisplayLabel,
+  normalizeRect,
+  rectHasArea,
+  selectionHasArea,
+  selectionToRects,
+  type Point,
+  type Rect,
+  type SelectionShape
+} from "../core/geometry";
 import { ImageDocument } from "../core/imageDocument";
 import { blackoutTool } from "../tools/blackoutTool";
 import { blurTool } from "../tools/blurTool";
@@ -10,6 +22,7 @@ type ExportFormat = "png" | "jpeg" | "webp";
 type EditorMode = "edit" | "slice";
 type PendingCutLine = "vertical" | "horizontal" | null;
 type ToolId = "mosaic" | "blur" | "blackout" | "cover";
+type SelectionMode = "rect" | "brush" | "polygon";
 
 type Viewport = {
   scale: number;
@@ -19,8 +32,10 @@ type Viewport = {
 
 type UiSettings = {
   activeToolId: ToolId;
+  selectionMode: SelectionMode;
   strengthValues: Record<"mosaic" | "blur", number>;
   coverColor: string;
+  brushSize: number;
   exportFormat: ExportFormat;
   exportQuality: number;
   workspaceSize: number;
@@ -47,6 +62,15 @@ type EditorElements = {
   slicePanel: HTMLElement;
   imageList: HTMLElement;
   activeImageMeta: HTMLElement;
+  rectModeButton: HTMLButtonElement;
+  brushModeButton: HTMLButtonElement;
+  polygonModeButton: HTMLButtonElement;
+  brushSizeGroup: HTMLElement;
+  brushSize: HTMLInputElement;
+  brushSizeValue: HTMLOutputElement;
+  polygonActions: HTMLElement;
+  finishPolygonButton: HTMLButtonElement;
+  cancelPolygonButton: HTMLButtonElement;
   mosaicToolButton: HTMLButtonElement;
   blurToolButton: HTMLButtonElement;
   blackoutToolButton: HTMLButtonElement;
@@ -72,6 +96,9 @@ type EditorElements = {
   rotateRightButton: HTMLButtonElement;
   flipHorizontalButton: HTMLButtonElement;
   flipVerticalButton: HTMLButtonElement;
+  templatePreset: HTMLSelectElement;
+  applyTemplateButton: HTMLButtonElement;
+  applyTemplateAllButton: HTMLButtonElement;
   showGrid: HTMLInputElement;
   gridSize: HTMLInputElement;
   gridSizeValue: HTMLOutputElement;
@@ -98,17 +125,27 @@ const SETTINGS_KEY = "image-tool-ui-settings-v1";
 
 const DEFAULT_SETTINGS: UiSettings = {
   activeToolId: "mosaic",
+  selectionMode: "rect",
   strengthValues: {
     mosaic: 18,
     blur: 12
   },
   coverColor: "#111827",
+  brushSize: 18,
   exportFormat: "png",
   exportQuality: 92,
   workspaceSize: 100,
   gridSize: 100,
   showGrid: true
 };
+
+const TEMPLATE_PRESETS = {
+  "instagram-square": { label: "Instagram 正方形", width: 1080, height: 1080 },
+  "instagram-story": { label: "Instagram 限時動態", width: 1080, height: 1920 },
+  "youtube-thumbnail": { label: "YouTube 縮圖", width: 1280, height: 720 },
+  "xiaohongshu-vertical": { label: "小紅書直式", width: 1242, height: 1660 },
+  "shop-banner": { label: "電商橫幅", width: 1600, height: 900 }
+} as const;
 
 const TOOL_CONFIG: Record<ToolId, {
   tool: EditorTool;
@@ -177,10 +214,11 @@ export function createEditorController(elements: EditorElements): void {
   const images: ImageEntry[] = [];
 
   let activeImageId: string | null = null;
-  let selections: Rect[] = [];
-  let draftSelection: Rect | null = null;
+  let selections: SelectionShape[] = [];
+  let draftSelection: SelectionShape | null = null;
   let dragStart: Point | null = null;
   let mode: EditorMode = "edit";
+  let selectionMode: SelectionMode = settings.selectionMode;
   let pendingCutLine: PendingCutLine = null;
   let verticalLines: number[] = [];
   let horizontalLines: number[] = [];
@@ -188,6 +226,7 @@ export function createEditorController(elements: EditorElements): void {
   let viewport: Viewport = { scale: 1, offsetX: 0, offsetY: 0 };
   let isBusy = false;
   let activeToolId: ToolId = settings.activeToolId;
+  let activePolygonPoints: Point[] = [];
 
   hydrateUiFromSettings();
 
@@ -210,11 +249,13 @@ export function createEditorController(elements: EditorElements): void {
   const saveSettings = () => {
     const next: UiSettings = {
       activeToolId,
+      selectionMode,
       strengthValues: {
         mosaic: settings.strengthValues.mosaic,
         blur: settings.strengthValues.blur
       },
       coverColor: elements.coverColor.value,
+      brushSize: Number(elements.brushSize.value),
       exportFormat: elements.exportFormat.value as ExportFormat,
       exportQuality: Number(elements.exportQuality.value),
       workspaceSize: Number(elements.workspaceSize.value),
@@ -230,6 +271,7 @@ export function createEditorController(elements: EditorElements): void {
     selections = [];
     draftSelection = null;
     dragStart = null;
+    activePolygonPoints = [];
   };
 
   const clearCutLines = () => {
@@ -279,6 +321,16 @@ export function createEditorController(elements: EditorElements): void {
     }
   };
 
+  const syncSelectionModeUi = () => {
+    elements.rectModeButton.classList.toggle("is-active", selectionMode === "rect");
+    elements.brushModeButton.classList.toggle("is-active", selectionMode === "brush");
+    elements.polygonModeButton.classList.toggle("is-active", selectionMode === "polygon");
+    elements.brushSizeGroup.hidden = selectionMode !== "brush";
+    elements.polygonActions.hidden = selectionMode !== "polygon";
+    elements.finishPolygonButton.disabled = activePolygonPoints.length < 3 || isBusy;
+    elements.cancelPolygonButton.disabled = activePolygonPoints.length === 0 || isBusy;
+  };
+
   const renderSelectionList = () => {
     if (selections.length === 0) {
       elements.selectionSummary.textContent = "尚未建立選區";
@@ -287,19 +339,24 @@ export function createEditorController(elements: EditorElements): void {
       return;
     }
 
-    const totalArea = selections.reduce((sum, selection) => sum + selection.width * selection.height, 0);
+    const totalArea = selections.reduce((sum, selection) => {
+      const bounds = getSelectionBounds(selection);
+      return sum + bounds.width * bounds.height;
+    }, 0);
     elements.selectionSummary.textContent = `${selections.length} 個區域 / ${Math.round(totalArea)} px²`;
     elements.selectionList.innerHTML = selections
       .map((selection, index) => {
-        const width = Math.round(selection.width);
-        const height = Math.round(selection.height);
-        const x = Math.round(selection.x);
-        const y = Math.round(selection.y);
+        const bounds = getSelectionBounds(selection);
+        const width = Math.round(bounds.width);
+        const height = Math.round(bounds.height);
+        const x = Math.round(bounds.x);
+        const y = Math.round(bounds.y);
+        const label = getSelectionDisplayLabel(selection);
 
         return `
           <div class="selection-item">
             <div>
-              <strong>區域 ${index + 1}</strong>
+              <strong>區域 ${index + 1} · ${label}</strong>
               <p>${x}, ${y} / ${width} × ${height}</p>
             </div>
             <button type="button" class="selection-remove-button" data-selection-index="${index}">
@@ -392,6 +449,7 @@ export function createEditorController(elements: EditorElements): void {
     renderImageList();
     updateActiveMeta();
     syncToolUi();
+    syncSelectionModeUi();
   };
 
   const render = () => {
@@ -425,11 +483,24 @@ export function createEditorController(elements: EditorElements): void {
 
     if (mode === "edit") {
       selections.forEach((selection, index) => {
-        drawSelection(context, selection, viewport, String(index + 1));
+        drawSelectionShape(context, selection, viewport, { label: String(index + 1) });
       });
 
-      if (draftSelection && rectHasArea(draftSelection)) {
-        drawSelection(context, draftSelection, viewport);
+      if (draftSelection && selectionHasArea(draftSelection)) {
+        drawSelectionShape(context, draftSelection, viewport, { dashed: true });
+      }
+
+      if (selectionMode === "polygon" && activePolygonPoints.length > 0) {
+        drawSelectionShape(
+          context,
+          {
+            id: "draft-polygon",
+            kind: "polygon",
+            points: activePolygonPoints
+          },
+          viewport,
+          { dashed: true, fill: "rgba(56, 189, 248, 0.10)" }
+        );
       }
     } else if (elements.showGrid.checked) {
       drawSliceGrid(
@@ -579,10 +650,13 @@ export function createEditorController(elements: EditorElements): void {
     try {
       setBusy(true, `${getActiveToolConfig().buttonLabel}處理中...`);
       const tool = getActiveToolConfig().tool;
+      const regions = selections.flatMap((selection) =>
+        selectionToRects(selection, bitmap.width, bitmap.height)
+      );
       const result = await applyToolToRegions(tool, bitmap, selections, {
         cellSize: Number(elements.cellSize.value),
         coverColor: elements.coverColor.value
-      });
+      }, regions);
 
       await activeEntry.document.replaceWith(result);
       await updateThumbnail(activeEntry);
@@ -747,6 +821,33 @@ export function createEditorController(elements: EditorElements): void {
     render();
   });
 
+  elements.rectModeButton.addEventListener("click", () => {
+    selectionMode = "rect";
+    draftSelection = null;
+    dragStart = null;
+    activePolygonPoints = [];
+    saveSettings();
+    render();
+  });
+
+  elements.brushModeButton.addEventListener("click", () => {
+    selectionMode = "brush";
+    draftSelection = null;
+    dragStart = null;
+    activePolygonPoints = [];
+    saveSettings();
+    render();
+  });
+
+  elements.polygonModeButton.addEventListener("click", () => {
+    selectionMode = "polygon";
+    draftSelection = null;
+    dragStart = null;
+    activePolygonPoints = [];
+    saveSettings();
+    render();
+  });
+
   elements.cellSize.addEventListener("input", () => {
     if (activeToolId === "mosaic" || activeToolId === "blur") {
       settings.strengthValues[activeToolId] = Number(elements.cellSize.value);
@@ -756,6 +857,12 @@ export function createEditorController(elements: EditorElements): void {
   });
 
   elements.coverColor.addEventListener("input", () => {
+    saveSettings();
+    render();
+  });
+
+  elements.brushSize.addEventListener("input", () => {
+    elements.brushSizeValue.value = `${elements.brushSize.value} px`;
     saveSettings();
     render();
   });
@@ -814,8 +921,27 @@ export function createEditorController(elements: EditorElements): void {
       return;
     }
 
+    if (selectionMode === "polygon") {
+      activePolygonPoints = [...activePolygonPoints, point];
+      render();
+      return;
+    }
+
     dragStart = point;
-    draftSelection = { x: point.x, y: point.y, width: 0, height: 0 };
+    if (selectionMode === "rect") {
+      draftSelection = {
+        id: crypto.randomUUID(),
+        kind: "rect",
+        rect: { x: point.x, y: point.y, width: 0, height: 0 }
+      };
+    } else {
+      draftSelection = {
+        id: crypto.randomUUID(),
+        kind: "brush",
+        points: [point],
+        radius: Number(elements.brushSize.value)
+      };
+    }
     elements.canvas.setPointerCapture(event.pointerId);
     render();
   });
@@ -827,7 +953,18 @@ export function createEditorController(elements: EditorElements): void {
     }
 
     const point = toImagePoint(event, elements.canvas, viewport);
-    draftSelection = clampRect(normalizeRect(dragStart, point), bitmap.width, bitmap.height);
+    if (selectionMode === "rect") {
+      draftSelection = {
+        id: draftSelection?.id ?? crypto.randomUUID(),
+        kind: "rect",
+        rect: clampRect(normalizeRect(dragStart, point), bitmap.width, bitmap.height)
+      };
+    } else if (draftSelection?.kind === "brush") {
+      draftSelection = {
+        ...draftSelection,
+        points: [...draftSelection.points, point]
+      };
+    }
     render();
   });
 
@@ -835,7 +972,7 @@ export function createEditorController(elements: EditorElements): void {
     if (isBusy) {
       return;
     }
-    if (draftSelection && rectHasArea(draftSelection)) {
+    if (draftSelection && selectionHasArea(draftSelection)) {
       selections = [...selections, draftSelection];
     }
 
@@ -850,6 +987,28 @@ export function createEditorController(elements: EditorElements): void {
   elements.canvas.addEventListener("pointercancel", () => {
     dragStart = null;
     draftSelection = null;
+    render();
+  });
+
+  elements.finishPolygonButton.addEventListener("click", () => {
+    if (activePolygonPoints.length < 3 || isBusy) {
+      return;
+    }
+
+    selections = [
+      ...selections,
+      {
+        id: crypto.randomUUID(),
+        kind: "polygon",
+        points: [...activePolygonPoints]
+      }
+    ];
+    activePolygonPoints = [];
+    render();
+  });
+
+  elements.cancelPolygonButton.addEventListener("click", () => {
+    activePolygonPoints = [];
     render();
   });
 
@@ -999,6 +1158,8 @@ export function createEditorController(elements: EditorElements): void {
     elements.exportFormat.value = settings.exportFormat;
     elements.exportQuality.value = String(settings.exportQuality);
     elements.exportQualityValue.value = `${settings.exportQuality}%`;
+    elements.brushSize.value = String(settings.brushSize);
+    elements.brushSizeValue.value = `${settings.brushSize} px`;
     elements.workspaceSize.value = String(settings.workspaceSize);
     elements.workspaceSizeValue.value = `${settings.workspaceSize}%`;
     elements.gridSize.value = String(settings.gridSize);
@@ -1061,8 +1222,9 @@ export function createEditorController(elements: EditorElements): void {
 async function applyToolToRegions(
   tool: EditorTool,
   source: ImageBitmap,
-  regions: Rect[],
-  settings: Record<string, number | string | boolean>
+  _selections: SelectionShape[],
+  settings: Record<string, number | string | boolean>,
+  regions: Rect[]
 ): Promise<HTMLCanvasElement> {
   if (tool.applyBatch) {
     return tool.applyBatch({ source, regions, settings });
@@ -1572,11 +1734,13 @@ function loadSettings(): UiSettings {
     const parsed = JSON.parse(raw) as Partial<UiSettings>;
     return {
       activeToolId: (parsed.activeToolId as ToolId) || DEFAULT_SETTINGS.activeToolId,
+      selectionMode: (parsed.selectionMode as SelectionMode) || DEFAULT_SETTINGS.selectionMode,
       strengthValues: {
         mosaic: parsed.strengthValues?.mosaic ?? DEFAULT_SETTINGS.strengthValues.mosaic,
         blur: parsed.strengthValues?.blur ?? DEFAULT_SETTINGS.strengthValues.blur
       },
       coverColor: parsed.coverColor ?? DEFAULT_SETTINGS.coverColor,
+      brushSize: parsed.brushSize ?? DEFAULT_SETTINGS.brushSize,
       exportFormat: (parsed.exportFormat as ExportFormat) || DEFAULT_SETTINGS.exportFormat,
       exportQuality: parsed.exportQuality ?? DEFAULT_SETTINGS.exportQuality,
       workspaceSize: parsed.workspaceSize ?? DEFAULT_SETTINGS.workspaceSize,
