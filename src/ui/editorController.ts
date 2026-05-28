@@ -87,6 +87,7 @@ type EditorElements = {
   editPanel: HTMLElement;
   slicePanel: HTMLElement;
   imageList: HTMLElement;
+  stageTopbar: HTMLElement;
   activeImageMeta: HTMLElement;
   rectModeButton: HTMLButtonElement;
   brushModeButton: HTMLButtonElement;
@@ -116,6 +117,7 @@ type EditorElements = {
   selectionCount: HTMLElement;
   selectionSummary: HTMLElement;
   selectionList: HTMLElement;
+  selectionListPanel: HTMLElement;
   compareToggle: HTMLInputElement;
   cropButton: HTMLButtonElement;
   rotateLeftButton: HTMLButtonElement;
@@ -385,12 +387,12 @@ export function createEditorController(elements: EditorElements): void {
 
   const renderSelectionList = () => {
     if (selections.length === 0) {
-      elements.selectionSummary.textContent = "尚未建立選區";
-      elements.selectionList.innerHTML =
-        '<p class="selection-list-empty">拖曳畫面建立第一個選區。</p>';
+      elements.selectionListPanel.hidden = true;
+      elements.selectionList.innerHTML = "";
       return;
     }
 
+    elements.selectionListPanel.hidden = false;
     const totalArea = selections.reduce((sum, selection) => {
       const bounds = getSelectionBounds(selection);
       return sum + bounds.width * bounds.height;
@@ -422,11 +424,14 @@ export function createEditorController(elements: EditorElements): void {
 
   const renderImageList = () => {
     if (images.length === 0) {
-      elements.imageList.innerHTML =
-        '<p class="image-list-empty">可同時放入多張圖片，逐張切換編輯，再一次匯出。</p>';
+      elements.imageList.hidden = true;
+      elements.imageList.innerHTML = "";
+      elements.stageTopbar.hidden = true;
       return;
     }
 
+    elements.imageList.hidden = false;
+    elements.stageTopbar.hidden = false;
     elements.imageList.innerHTML = images
       .map((entry) => {
         const isActive = entry.id === activeImageId;

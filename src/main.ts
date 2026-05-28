@@ -14,6 +14,7 @@ const sliceTab = document.querySelector<HTMLButtonElement>("#sliceTab");
 const editPanel = document.querySelector<HTMLElement>("#editPanel");
 const slicePanel = document.querySelector<HTMLElement>("#slicePanel");
 const imageList = document.querySelector<HTMLElement>("#imageList");
+const stageTopbar = document.querySelector<HTMLElement>("#stageTopbar");
 const activeImageMeta = document.querySelector<HTMLElement>("#activeImageMeta");
 const rectModeButton = document.querySelector<HTMLButtonElement>("#rectModeButton");
 const brushModeButton = document.querySelector<HTMLButtonElement>("#brushModeButton");
@@ -43,6 +44,7 @@ const workspaceSizeValue = document.querySelector<HTMLOutputElement>("#workspace
 const selectionCount = document.querySelector<HTMLElement>("#selectionCount");
 const selectionSummary = document.querySelector<HTMLElement>("#selectionSummary");
 const selectionList = document.querySelector<HTMLElement>("#selectionList");
+const selectionListPanel = document.querySelector<HTMLElement>("#selectionListPanel");
 const compareToggle = document.querySelector<HTMLInputElement>("#compareToggle");
 const cropButton = document.querySelector<HTMLButtonElement>("#cropButton");
 const rotateLeftButton = document.querySelector<HTMLButtonElement>("#rotateLeftButton");
@@ -88,6 +90,7 @@ if (
   !editPanel ||
   !slicePanel ||
   !imageList ||
+  !stageTopbar ||
   !activeImageMeta ||
   !rectModeButton ||
   !brushModeButton ||
@@ -117,6 +120,7 @@ if (
   !selectionCount ||
   !selectionSummary ||
   !selectionList ||
+  !selectionListPanel ||
   !compareToggle ||
   !cropButton ||
   !rotateLeftButton ||
@@ -165,6 +169,7 @@ createEditorController({
   editPanel,
   slicePanel,
   imageList,
+  stageTopbar,
   activeImageMeta,
   rectModeButton,
   brushModeButton,
@@ -194,6 +199,7 @@ createEditorController({
   selectionCount,
   selectionSummary,
   selectionList,
+  selectionListPanel,
   compareToggle,
   cropButton,
   rotateLeftButton,

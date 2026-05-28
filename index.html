@@ -8,9 +8,12 @@
   <body>
     <main id="app" class="app-shell">
       <section class="toolbar" aria-label="圖片工具列">
-        <div>
-          <p class="eyebrow">Local image editor</p>
-          <h1>圖片工具 <span class="privacy-badge" title="所有處理都在你的瀏覽器內完成，不會上傳任何資料">🔒 100% 本機</span></h1>
+        <div class="toolbar-brand">
+          <p class="eyebrow">
+            <span>Local image editor</span>
+            <span class="privacy-badge" title="所有處理都在你的瀏覽器內完成，不會上傳任何資料">🔒 100% 本機</span>
+          </p>
+          <h1>圖片工具</h1>
           <p class="toolbar-copy">遮蔽、裁切、切片、輸出 — 完全在你的瀏覽器內處理，不上傳。</p>
         </div>
 
@@ -84,20 +87,20 @@
               <strong id="selectionCount">0</strong>
             </div>
 
-            <div class="action-grid">
-              <button id="applyButton" type="button" disabled title="把目前選的遮蔽效果套用到所有選區 (Enter)">套用全部馬賽克</button>
-              <button id="removeLastSelectionButton" type="button" disabled title="刪除最新的一個選區 (Backspace / Delete)">刪除最後一個</button>
-              <button id="clearSelectionButton" type="button" disabled title="清除所有選區 (Esc)">清除全部選取</button>
+            <div class="apply-row">
+              <button id="applyButton" class="primary-action" type="button" disabled title="把目前選的遮蔽效果套用到所有選區 (Enter)">套用全部馬賽克</button>
+              <div class="action-grid action-grid-secondary">
+                <button id="removeLastSelectionButton" type="button" disabled title="刪除最新的一個選區 (Backspace / Delete)">刪除最後一個</button>
+                <button id="clearSelectionButton" type="button" disabled title="清除所有選區 (Esc)">清除全部選取</button>
+              </div>
             </div>
 
-            <div class="selection-list-panel">
+            <div id="selectionListPanel" class="selection-list-panel" hidden>
               <div class="section-heading">
                 <span>選區清單</span>
                 <span id="selectionSummary">尚未建立選區</span>
               </div>
-              <div id="selectionList" class="selection-list" aria-live="polite">
-                <p class="selection-list-empty">拖曳畫面建立第一個選區。</p>
-              </div>
+              <div id="selectionList" class="selection-list" aria-live="polite"></div>
             </div>
 
             <div class="control-group">
@@ -107,48 +110,52 @@
               </label>
             </div>
 
-            <div class="section-block">
-              <div class="section-heading">
-                <span>圖片整理</span>
-                <span>用最後一個選區裁切</span>
+            <details class="collapsible-section">
+              <summary>
+                <span class="collapsible-title">圖片整理</span>
+                <span class="collapsible-hint">裁切 · 旋轉 · 翻轉</span>
+              </summary>
+              <div class="collapsible-body">
+                <div class="action-grid transform-grid">
+                  <button id="cropButton" type="button" disabled title="把圖片裁切成最後一個選區的範圍">裁成最後選區</button>
+                  <button id="rotateLeftButton" type="button" disabled title="逆時針旋轉 90 度">左轉 90°</button>
+                  <button id="rotateRightButton" type="button" disabled title="順時針旋轉 90 度">右轉 90°</button>
+                  <button id="flipHorizontalButton" type="button" disabled title="左右翻轉（鏡像）">水平翻轉</button>
+                  <button id="flipVerticalButton" type="button" disabled title="上下翻轉">垂直翻轉</button>
+                </div>
               </div>
-              <div class="action-grid transform-grid">
-                <button id="cropButton" type="button" disabled title="把圖片裁切成最後一個選區的範圍">裁成最後選區</button>
-                <button id="rotateLeftButton" type="button" disabled title="逆時針旋轉 90 度">左轉 90°</button>
-                <button id="rotateRightButton" type="button" disabled title="順時針旋轉 90 度">右轉 90°</button>
-                <button id="flipHorizontalButton" type="button" disabled title="左右翻轉（鏡像）">水平翻轉</button>
-                <button id="flipVerticalButton" type="button" disabled title="上下翻轉">垂直翻轉</button>
-              </div>
-            </div>
+            </details>
 
-            <div class="section-block">
-              <div class="section-heading">
-                <span>社群尺寸模板</span>
-                <span>可套用到目前圖片或全部圖片</span>
+            <details class="collapsible-section">
+              <summary>
+                <span class="collapsible-title">社群尺寸模板</span>
+                <span class="collapsible-hint">5 種預設尺寸</span>
+              </summary>
+              <div class="collapsible-body">
+                <div class="control-group">
+                  <label for="templatePreset">模板</label>
+                  <select id="templatePreset">
+                    <option value="instagram-square">Instagram 正方形 1080×1080</option>
+                    <option value="instagram-story">Instagram 限時動態 1080×1920</option>
+                    <option value="youtube-thumbnail">YouTube 縮圖 1280×720</option>
+                    <option value="xiaohongshu-vertical">小紅書直式 1242×1660</option>
+                    <option value="shop-banner">電商橫幅 1600×900</option>
+                  </select>
+                </div>
+                <div class="control-group">
+                  <label for="templateFillMode">背景填滿</label>
+                  <select id="templateFillMode">
+                    <option value="blur">原圖模糊（推薦）</option>
+                    <option value="white">白色</option>
+                    <option value="black">黑色</option>
+                  </select>
+                </div>
+                <div class="action-grid">
+                  <button id="applyTemplateButton" type="button" disabled>套用到目前圖片</button>
+                  <button id="applyTemplateAllButton" type="button" disabled>批次套用全部圖片</button>
+                </div>
               </div>
-              <div class="control-group">
-                <label for="templatePreset">模板</label>
-                <select id="templatePreset">
-                  <option value="instagram-square">Instagram 正方形 1080×1080</option>
-                  <option value="instagram-story">Instagram 限時動態 1080×1920</option>
-                  <option value="youtube-thumbnail">YouTube 縮圖 1280×720</option>
-                  <option value="xiaohongshu-vertical">小紅書直式 1242×1660</option>
-                  <option value="shop-banner">電商橫幅 1600×900</option>
-                </select>
-              </div>
-              <div class="control-group">
-                <label for="templateFillMode">背景填滿</label>
-                <select id="templateFillMode">
-                  <option value="blur">原圖模糊（推薦）</option>
-                  <option value="white">白色</option>
-                  <option value="black">黑色</option>
-                </select>
-              </div>
-              <div class="action-grid">
-                <button id="applyTemplateButton" type="button" disabled>套用到目前圖片</button>
-                <button id="applyTemplateAllButton" type="button" disabled>批次套用全部圖片</button>
-              </div>
-            </div>
+            </details>
 
             <div class="action-grid history-grid">
               <button id="undoButton" type="button" disabled title="復原上一步 (Cmd/Ctrl+Z)">復原</button>
@@ -239,31 +246,34 @@
         </aside>
 
         <section class="stage-layout" aria-label="圖片工作區">
-          <div class="stage-topbar">
+          <div id="stageTopbar" class="stage-topbar" hidden>
             <div>
-              <p class="stage-label">圖片清單</p>
+              <p class="stage-label">目前圖片</p>
               <p id="activeImageMeta" class="stage-meta">尚未載入圖片</p>
             </div>
           </div>
 
-          <div id="imageList" class="image-list" aria-label="已載入圖片清單">
-            <p class="image-list-empty">可同時放入多張圖片，逐張切換編輯，再一次匯出。</p>
-          </div>
+          <div id="imageList" class="image-list" aria-label="已載入圖片清單" hidden></div>
 
           <section id="canvasPanel" class="canvas-panel" aria-label="圖片編輯區">
             <div id="dropZone" class="drop-zone">
               <canvas id="imageCanvas" aria-label="圖片畫布"></canvas>
               <div id="emptyState" class="empty-state">
-                <div class="sample-image" aria-hidden="true"></div>
+                <div class="empty-icon" aria-hidden="true">
+                  <svg viewBox="0 0 64 64" width="64" height="64" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="8" y="14" width="48" height="36" rx="4"/>
+                    <circle cx="22" cy="26" r="3.5"/>
+                    <path d="M10 44 L24 32 L36 42 L46 30 L54 38"/>
+                  </svg>
+                </div>
                 <h2>把圖片拖到這裡開始</h2>
                 <p>支援 JPG、PNG、WebP、PDF — 也可以直接 <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>V</kbd> 從剪貼簿貼上。</p>
                 <ol class="workflow-steps" aria-label="使用流程">
-                  <li><span class="step-num">1</span>拖入圖片</li>
-                  <li><span class="step-num">2</span>框選範圍</li>
-                  <li><span class="step-num">3</span>套用效果</li>
-                  <li><span class="step-num">4</span>下載成果</li>
+                  <li><span class="step-num">1</span><span class="step-label">放入圖片</span></li>
+                  <li><span class="step-num">2</span><span class="step-label">框選範圍</span></li>
+                  <li><span class="step-num">3</span><span class="step-label">套用效果</span></li>
+                  <li><span class="step-num">4</span><span class="step-label">下載成果</span></li>
                 </ol>
-                <p class="trust-line">不上傳 · 不存伺服器 · 關掉視窗就消失</p>
               </div>
             </div>
           </section>
