@@ -126,6 +126,24 @@ type EditorElements = {
   watermarkText: HTMLInputElement;
   watermarkPosition: HTMLSelectElement;
   leaveNoTraceButton: HTMLButtonElement;
+  logoInput: HTMLInputElement;
+  logoPreview: HTMLImageElement;
+  logoPreviewRow: HTMLElement;
+  logoClearButton: HTMLButtonElement;
+  logoPosition: HTMLSelectElement;
+  logoSizePercent: HTMLInputElement;
+  logoSizeValue: HTMLOutputElement;
+  logoSafeArea: HTMLInputElement;
+  logoSafeAreaValue: HTMLOutputElement;
+  logoSafeAreaUnit: HTMLInputElement;
+  logoSafeAreaUnitValue: HTMLOutputElement;
+  logoSafeAreaShow: HTMLInputElement;
+  logoSafeAreaWarn: HTMLElement;
+  logoStatusHint: HTMLElement;
+  applyLogoButton: HTMLButtonElement;
+  applyLogoAllButton: HTMLButtonElement;
+  applyScopeRow: HTMLElement;
+  applyToAllImagesToggle: HTMLInputElement;
   exportName: HTMLInputElement;
   exportFormat: HTMLSelectElement;
   exportQuality: HTMLInputElement;
@@ -278,6 +296,8 @@ export function createEditorController(elements: EditorElements): void {
   let activeToolId: ToolId = settings.activeToolId;
   let activePolygonPoints: Point[] = [];
   let highlightedSelectionIndex: number | null = null;
+  let logoBitmap: ImageBitmap | null = null;
+  let logoName = "";
   const selectionEffects = new Map<string, ToolId>();
 
   const TOOL_ORDER: ToolId[] = ["mosaic", "blur", "blackout", "cover"];
@@ -518,6 +538,7 @@ export function createEditorController(elements: EditorElements): void {
     elements.editPanel.hidden = mode !== "edit";
     elements.slicePanel.hidden = mode !== "slice";
     elements.applyButton.disabled = !hasImage || !hasSelection || isBusy;
+    elements.applyScopeRow.hidden = !hasSelection || images.length < 2;
     if (hasSelection) {
       const effects = new Set(selections.map((s) => getSelectionEffect(s)));
       if (effects.size > 1) {
@@ -542,6 +563,9 @@ export function createEditorController(elements: EditorElements): void {
     elements.flipVerticalButton.disabled = !hasImage || isBusy;
     elements.applyTemplateButton.disabled = !hasImage || isBusy;
     elements.applyTemplateAllButton.disabled = images.length === 0 || isBusy;
+    elements.applyLogoButton.disabled = !hasImage || !logoBitmap || isBusy;
+    elements.applyLogoAllButton.disabled = images.length === 0 || !logoBitmap || isBusy;
+    updateLogoUi();
     elements.downloadButton.disabled = !hasImage || isBusy;
     elements.copyToClipboardButton.disabled = !hasImage || isBusy;
     elements.downloadAllButton.disabled = images.length === 0 || isBusy;
@@ -565,6 +589,135 @@ export function createEditorController(elements: EditorElements): void {
     updateActiveMeta();
     syncToolUi();
     syncSelectionModeUi();
+  };
+
+  const computeLogoRect = (imageWidth: number, imageHeight: number): Rect => {
+    if (!logoBitmap) {
+      return { x: 0, y: 0, width: 0, height: 0 };
+    }
+    const sizePercent = Math.max(1, Math.min(60, Number(elements.logoSizePercent.value))) / 100;
+    const logoWidth = imageWidth * sizePercent;
+    const aspect = logoBitmap.width / logoBitmap.height;
+    const logoHeight = logoWidth / aspect;
+    const safeAreaMultiplier = Math.max(0, Number(elements.logoSafeArea.value)) / 100;
+    const xPercentOfLogo = Math.max(5, Math.min(100, Number(elements.logoSafeAreaUnit.value))) / 100;
+    const xUnit = logoHeight * xPercentOfLogo;
+    const safeMargin = xUnit * safeAreaMultiplier;
+    const minPadding = Math.max(8, Math.min(imageWidth, imageHeight) * 0.02);
+    const padding = Math.max(minPadding, safeMargin);
+    const position = elements.logoPosition.value;
+    let x = imageWidth - logoWidth - padding;
+    let y = imageHeight - logoHeight - padding;
+    if (position === "bl") {
+      x = padding;
+    } else if (position === "tr") {
+      y = padding;
+    } else if (position === "tl") {
+      x = padding;
+      y = padding;
+    } else if (position === "center") {
+      x = (imageWidth - logoWidth) / 2;
+      y = (imageHeight - logoHeight) / 2;
+    }
+    return { x, y, width: logoWidth, height: logoHeight };
+  };
+
+  const getSafeAreaMargin = (logoRect: Rect): number => {
+    const multiplier = Number(elements.logoSafeArea.value) / 100;
+    const xPercent = Math.max(5, Math.min(100, Number(elements.logoSafeAreaUnit.value))) / 100;
+    return logoRect.height * xPercent * multiplier;
+  };
+
+  const expandRectByMargin = (rect: Rect, margin: number): Rect => ({
+    x: rect.x - margin,
+    y: rect.y - margin,
+    width: rect.width + margin * 2,
+    height: rect.height + margin * 2
+  });
+
+  const drawLogoOverlay = (
+    ctx: CanvasRenderingContext2D,
+    logo: ImageBitmap,
+    logoRect: Rect,
+    vp: Viewport
+  ): void => {
+    ctx.save();
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(
+      logo,
+      logoRect.x * vp.scale + vp.offsetX,
+      logoRect.y * vp.scale + vp.offsetY,
+      logoRect.width * vp.scale,
+      logoRect.height * vp.scale
+    );
+    ctx.restore();
+  };
+
+  const drawSafeAreaOutline = (
+    ctx: CanvasRenderingContext2D,
+    safeRect: Rect,
+    vp: Viewport
+  ): void => {
+    ctx.save();
+    ctx.strokeStyle = "rgba(34, 197, 94, 0.95)";
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 5]);
+    ctx.strokeRect(
+      safeRect.x * vp.scale + vp.offsetX,
+      safeRect.y * vp.scale + vp.offsetY,
+      safeRect.width * vp.scale,
+      safeRect.height * vp.scale
+    );
+    ctx.setLineDash([]);
+    ctx.restore();
+  };
+
+  const rectsOverlap = (a: Rect, b: Rect): boolean =>
+    a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+
+  const updateLogoUi = () => {
+    elements.logoSizeValue.value = `${elements.logoSizePercent.value}%`;
+    elements.logoSafeAreaUnitValue.value = `${elements.logoSafeAreaUnit.value}%`;
+    const multiplier = Number(elements.logoSafeArea.value) / 100;
+    elements.logoSafeAreaValue.value = `${multiplier.toFixed(1)}× X`;
+
+    elements.logoPreviewRow.hidden = !logoBitmap;
+    elements.logoStatusHint.textContent = logoBitmap ? logoName : "未載入 logo";
+
+    if (!logoBitmap) {
+      elements.logoSafeAreaWarn.hidden = true;
+      return;
+    }
+    const bitmap = getCurrentBitmap();
+    if (!bitmap || selections.length === 0) {
+      elements.logoSafeAreaWarn.hidden = true;
+      return;
+    }
+    const logoRect = computeLogoRect(bitmap.width, bitmap.height);
+    const safeRect = expandRectByMargin(logoRect, getSafeAreaMargin(logoRect));
+    const hasCollision = selections.some((sel) => {
+      const bounds = getSelectionBounds(sel);
+      return rectsOverlap(bounds, safeRect);
+    });
+    elements.logoSafeAreaWarn.hidden = !hasCollision;
+  };
+
+  const stampLogoOnBitmap = (bitmap: ImageBitmap): HTMLCanvasElement => {
+    if (!logoBitmap) {
+      throw new Error("Logo not loaded");
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      throw new Error("Canvas not supported");
+    }
+    ctx.drawImage(bitmap, 0, 0);
+    const logoRect = computeLogoRect(bitmap.width, bitmap.height);
+    ctx.drawImage(logoBitmap, logoRect.x, logoRect.y, logoRect.width, logoRect.height);
+    return canvas;
   };
 
   const render = () => {
@@ -597,6 +750,15 @@ export function createEditorController(elements: EditorElements): void {
     );
 
     if (mode === "edit") {
+      if (logoBitmap) {
+        const logoRect = computeLogoRect(bitmap.width, bitmap.height);
+        drawLogoOverlay(context, logoBitmap, logoRect, viewport);
+        if (elements.logoSafeAreaShow.checked) {
+          const safeRect = expandRectByMargin(logoRect, getSafeAreaMargin(logoRect));
+          drawSafeAreaOutline(context, safeRect, viewport);
+        }
+      }
+
       selections.forEach((selection, index) => {
         const isHighlighted = index === highlightedSelectionIndex;
         drawSelectionShape(context, selection, viewport, {
@@ -817,6 +979,37 @@ export function createEditorController(elements: EditorElements): void {
     render();
   };
 
+  const applyEffectsToBitmap = async (bitmap: ImageBitmap, sels: SelectionShape[]): Promise<HTMLCanvasElement | null> => {
+    const groups = new Map<ToolId, SelectionShape[]>();
+    for (const selection of sels) {
+      const effect = getSelectionEffect(selection);
+      const list = groups.get(effect) ?? [];
+      list.push(selection);
+      groups.set(effect, list);
+    }
+    let workingSource: ImageBitmap = bitmap;
+    let lastResult: HTMLCanvasElement | null = null;
+    let intermediate: ImageBitmap | null = null;
+    for (const [effectId, effectSels] of groups) {
+      const tool = TOOL_CONFIG[effectId].tool;
+      const regions = effectSels.flatMap((selection) =>
+        selectionToRects(selection, workingSource.width, workingSource.height)
+      );
+      const canvas = await applyToolToRegions(tool, workingSource, effectSels, {
+        cellSize: Number(elements.cellSize.value),
+        coverColor: elements.coverColor.value
+      }, regions);
+      lastResult = canvas;
+      if (intermediate) {
+        intermediate.close();
+      }
+      intermediate = await createImageBitmap(canvas);
+      workingSource = intermediate;
+    }
+    intermediate?.close();
+    return lastResult;
+  };
+
   const applyCurrentTool = async () => {
     const activeEntry = getActiveEntry();
     const startBitmap = activeEntry?.document.bitmap;
@@ -825,40 +1018,38 @@ export function createEditorController(elements: EditorElements): void {
       return;
     }
 
-    const groups = new Map<ToolId, SelectionShape[]>();
-    for (const selection of selections) {
-      const effect = getSelectionEffect(selection);
-      const list = groups.get(effect) ?? [];
-      list.push(selection);
-      groups.set(effect, list);
+    const applyToAll = elements.applyToAllImagesToggle.checked && images.length > 1;
+    if (applyToAll && !window.confirm(`把目前 ${selections.length} 個選區的遮蔽效果套用到全部 ${images.length} 張圖片同位置？`)) {
+      return;
     }
 
+    const effectCount = new Set(selections.map((s) => getSelectionEffect(s))).size;
+
     try {
-      setBusy(true, groups.size > 1 ? `套用 ${groups.size} 種效果中...` : `${getActiveToolConfig().buttonLabel}處理中...`);
-      let workingSource: ImageBitmap = startBitmap;
-      let lastResult: HTMLCanvasElement | null = null;
-      let intermediate: ImageBitmap | null = null;
-      for (const [effectId, effectSelections] of groups) {
-        const tool = TOOL_CONFIG[effectId].tool;
-        const regions = effectSelections.flatMap((selection) =>
-          selectionToRects(selection, workingSource.width, workingSource.height)
-        );
-        const canvas = await applyToolToRegions(tool, workingSource, effectSelections, {
-          cellSize: Number(elements.cellSize.value),
-          coverColor: elements.coverColor.value
-        }, regions);
-        lastResult = canvas;
-        if (intermediate) {
-          intermediate.close();
+      if (applyToAll) {
+        let processed = 0;
+        setBusy(true, `批次套用遮蔽 (0/${images.length})...`);
+        for (const entry of images) {
+          const bitmap = entry.document.bitmap;
+          if (!bitmap) {
+            continue;
+          }
+          processed += 1;
+          setBusy(true, `批次套用遮蔽 (${processed}/${images.length})...`);
+          const result = await applyEffectsToBitmap(bitmap, selections);
+          if (result) {
+            await entry.document.replaceWith(result);
+            await updateThumbnail(entry);
+          }
         }
-        intermediate = await createImageBitmap(canvas);
-        workingSource = intermediate;
+      } else {
+        setBusy(true, effectCount > 1 ? `套用 ${effectCount} 種效果中...` : `${getActiveToolConfig().buttonLabel}處理中...`);
+        const result = await applyEffectsToBitmap(startBitmap, selections);
+        if (result) {
+          await activeEntry.document.replaceWith(result);
+          await updateThumbnail(activeEntry);
+        }
       }
-      if (lastResult) {
-        await activeEntry.document.replaceWith(lastResult);
-      }
-      intermediate?.close();
-      await updateThumbnail(activeEntry);
       clearSelections();
     } catch (error) {
       reportError(error, "套用效果失敗，請稍後再試。");
@@ -1163,6 +1354,88 @@ export function createEditorController(elements: EditorElements): void {
 
   elements.watermarkText.addEventListener("input", saveSettings);
   elements.watermarkPosition.addEventListener("change", saveSettings);
+
+  const loadLogoFile = async (file: File) => {
+    try {
+      setBusy(true, "載入 logo 中...");
+      const bitmap = await createImageBitmap(file);
+      logoBitmap?.close();
+      logoBitmap = bitmap;
+      logoName = file.name;
+      elements.logoPreview.src = URL.createObjectURL(file);
+      setBusy(false);
+      render();
+    } catch (error) {
+      setBusy(false);
+      reportError(error, "logo 載入失敗，請改用 PNG 或 SVG 檔案");
+    }
+  };
+
+  elements.logoInput.addEventListener("change", async (event) => {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (file) {
+      await loadLogoFile(file);
+    }
+    elements.logoInput.value = "";
+  });
+
+  elements.logoClearButton.addEventListener("click", () => {
+    logoBitmap?.close();
+    logoBitmap = null;
+    logoName = "";
+    elements.logoPreview.removeAttribute("src");
+    render();
+  });
+
+  const onLogoControlChange = () => {
+    render();
+  };
+  elements.logoPosition.addEventListener("change", onLogoControlChange);
+  elements.logoSizePercent.addEventListener("input", onLogoControlChange);
+  elements.logoSafeArea.addEventListener("input", onLogoControlChange);
+  elements.logoSafeAreaShow.addEventListener("change", onLogoControlChange);
+  elements.logoSafeAreaUnit.addEventListener("input", onLogoControlChange);
+
+  elements.applyLogoButton.addEventListener("click", async () => {
+    if (!logoBitmap) {
+      return;
+    }
+    await transformCurrentImage((bitmap) => stampLogoOnBitmap(bitmap), {
+      message: "烙印 logo 到圖片中..."
+    });
+  });
+
+  elements.applyLogoAllButton.addEventListener("click", async () => {
+    if (!logoBitmap || images.length === 0 || isBusy) {
+      return;
+    }
+    if (
+      images.length > 1 &&
+      !window.confirm(`把目前 logo + 位置烙印到 ${images.length} 張圖片？`)
+    ) {
+      return;
+    }
+    try {
+      let processed = 0;
+      setBusy(true, `批次烙印 logo (0/${images.length})...`);
+      for (const entry of images) {
+        const bitmap = entry.document.bitmap;
+        if (!bitmap) {
+          continue;
+        }
+        processed += 1;
+        setBusy(true, `批次烙印 logo (${processed}/${images.length})...`);
+        const canvas = stampLogoOnBitmap(bitmap);
+        await entry.document.replaceWith(canvas);
+        await updateThumbnail(entry);
+      }
+    } catch (error) {
+      reportError(error, "批次烙印 logo 失敗");
+    } finally {
+      setBusy(false);
+      render();
+    }
+  });
 
   elements.leaveNoTraceButton.addEventListener("click", () => {
     const confirmed = window.confirm(

@@ -44,6 +44,24 @@ const applyButtonLabel = document.querySelector<HTMLElement>("#applyButton .prim
 const watermarkText = document.querySelector<HTMLInputElement>("#watermarkText");
 const watermarkPosition = document.querySelector<HTMLSelectElement>("#watermarkPosition");
 const leaveNoTraceButton = document.querySelector<HTMLButtonElement>("#leaveNoTraceButton");
+const logoInput = document.querySelector<HTMLInputElement>("#logoInput");
+const logoPreview = document.querySelector<HTMLImageElement>("#logoPreview");
+const logoPreviewRow = document.querySelector<HTMLElement>("#logoPreviewRow");
+const logoClearButton = document.querySelector<HTMLButtonElement>("#logoClearButton");
+const logoPosition = document.querySelector<HTMLSelectElement>("#logoPosition");
+const logoSizePercent = document.querySelector<HTMLInputElement>("#logoSizePercent");
+const logoSizeValue = document.querySelector<HTMLOutputElement>("#logoSizeValue");
+const logoSafeArea = document.querySelector<HTMLInputElement>("#logoSafeArea");
+const logoSafeAreaValue = document.querySelector<HTMLOutputElement>("#logoSafeAreaValue");
+const logoSafeAreaUnit = document.querySelector<HTMLInputElement>("#logoSafeAreaUnit");
+const logoSafeAreaUnitValue = document.querySelector<HTMLOutputElement>("#logoSafeAreaUnitValue");
+const logoSafeAreaShow = document.querySelector<HTMLInputElement>("#logoSafeAreaShow");
+const logoSafeAreaWarn = document.querySelector<HTMLElement>("#logoSafeAreaWarn");
+const logoStatusHint = document.querySelector<HTMLElement>("#logoStatusHint");
+const applyLogoButton = document.querySelector<HTMLButtonElement>("#applyLogoButton");
+const applyLogoAllButton = document.querySelector<HTMLButtonElement>("#applyLogoAllButton");
+const applyScopeRow = document.querySelector<HTMLElement>("#applyScopeRow");
+const applyToAllImagesToggle = document.querySelector<HTMLInputElement>("#applyToAllImagesToggle");
 const exportName = document.querySelector<HTMLInputElement>("#exportName");
 const exportFormat = document.querySelector<HTMLSelectElement>("#exportFormat");
 const exportQuality = document.querySelector<HTMLInputElement>("#exportQuality");
@@ -124,6 +142,24 @@ if (
   !watermarkText ||
   !watermarkPosition ||
   !leaveNoTraceButton ||
+  !logoInput ||
+  !logoPreview ||
+  !logoPreviewRow ||
+  !logoClearButton ||
+  !logoPosition ||
+  !logoSizePercent ||
+  !logoSizeValue ||
+  !logoSafeArea ||
+  !logoSafeAreaValue ||
+  !logoSafeAreaUnit ||
+  !logoSafeAreaUnitValue ||
+  !logoSafeAreaShow ||
+  !logoSafeAreaWarn ||
+  !logoStatusHint ||
+  !applyLogoButton ||
+  !applyLogoAllButton ||
+  !applyScopeRow ||
+  !applyToAllImagesToggle ||
   !cellSize ||
   !cellSizeValue ||
   !effectHint ||
@@ -212,6 +248,24 @@ createEditorController({
   watermarkText,
   watermarkPosition,
   leaveNoTraceButton,
+  logoInput,
+  logoPreview,
+  logoPreviewRow,
+  logoClearButton,
+  logoPosition,
+  logoSizePercent,
+  logoSizeValue,
+  logoSafeArea,
+  logoSafeAreaValue,
+  logoSafeAreaUnit,
+  logoSafeAreaUnitValue,
+  logoSafeAreaShow,
+  logoSafeAreaWarn,
+  logoStatusHint,
+  applyLogoButton,
+  applyLogoAllButton,
+  applyScopeRow,
+  applyToAllImagesToggle,
   cellSize,
   cellSizeValue,
   effectHint,

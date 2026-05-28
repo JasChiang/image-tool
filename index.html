@@ -84,6 +84,10 @@
             </div>
 
             <div class="apply-row">
+              <label class="checkbox-row apply-scope" id="applyScopeRow" hidden>
+                <input id="applyToAllImagesToggle" type="checkbox" />
+                同時套用到所有圖片（用同樣的選區位置）
+              </label>
               <button id="applyButton" class="primary-action" type="button" disabled title="把目前選的遮蔽效果套用到所有選區 (Enter)">
                 <span class="primary-action-label">套用全部馬賽克</span>
                 <span class="primary-action-count" id="selectionCount" hidden>0</span>
@@ -165,6 +169,58 @@
                 <div class="action-grid">
                   <button id="applyTemplateButton" type="button" disabled>套用到目前圖片</button>
                   <button id="applyTemplateAllButton" type="button" disabled>批次套用全部圖片</button>
+                </div>
+              </div>
+            </details>
+
+            <details class="collapsible-section">
+              <summary>
+                <span class="collapsible-title">品牌 Logo</span>
+                <span class="collapsible-hint" id="logoStatusHint">未載入 logo</span>
+              </summary>
+              <div class="collapsible-body">
+                <label class="file-button logo-upload-button">
+                  <input id="logoInput" type="file" accept="image/png,image/svg+xml,image/webp" />
+                  選擇 Logo（建議 PNG / SVG 透明背景）
+                </label>
+                <div class="logo-preview-row" id="logoPreviewRow" hidden>
+                  <img id="logoPreview" alt="Logo 預覽" />
+                  <button id="logoClearButton" type="button" class="ghost-button" title="移除目前的 logo">移除</button>
+                </div>
+                <div class="inline-control">
+                  <label for="logoPosition">位置</label>
+                  <select id="logoPosition">
+                    <option value="br">右下角</option>
+                    <option value="bl">左下角</option>
+                    <option value="tr">右上角</option>
+                    <option value="tl">左上角</option>
+                    <option value="center">置中</option>
+                  </select>
+                </div>
+                <div class="inline-control">
+                  <label for="logoSizePercent">大小</label>
+                  <input id="logoSizePercent" type="range" min="4" max="30" value="12" />
+                  <output id="logoSizeValue" for="logoSizePercent">12%</output>
+                </div>
+                <div class="inline-control">
+                  <label for="logoSafeAreaUnit">X 占 logo 高度</label>
+                  <input id="logoSafeAreaUnit" type="range" min="5" max="100" step="5" value="100" />
+                  <output id="logoSafeAreaUnitValue" for="logoSafeAreaUnit">100%</output>
+                </div>
+                <div class="inline-control">
+                  <label for="logoSafeArea">安全區域</label>
+                  <input id="logoSafeArea" type="range" min="0" max="400" step="10" value="100" />
+                  <output id="logoSafeAreaValue" for="logoSafeArea">1× X</output>
+                </div>
+                <p class="helper-text logo-safe-hint">先估算 X 占 logo 高度多少（Senao 那種是 ~20%、大多 wordmark 是 25-50%、icon-only logo 則 ~100%），再設定要幾倍 X 當作淨空。</p>
+                <label class="checkbox-row">
+                  <input id="logoSafeAreaShow" type="checkbox" checked />
+                  顯示安全區域虛線框
+                </label>
+                <p id="logoSafeAreaWarn" class="logo-warn" hidden>⚠ 有選區進入 logo 安全區域</p>
+                <div class="action-grid">
+                  <button id="applyLogoButton" type="button" class="primary-action" disabled>烙印 Logo 到目前圖片</button>
+                  <button id="applyLogoAllButton" type="button" disabled>批次套用到全部圖片</button>
                 </div>
               </div>
             </details>
