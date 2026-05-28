@@ -326,12 +326,21 @@ export function createEditorController(elements: EditorElements): void {
   const setBusy = (busy: boolean, message?: string) => {
     isBusy = busy;
     elements.dropZone.classList.toggle("is-busy", busy);
-    if (busy && elements.processingStatus.classList.contains("is-error")) {
-      elements.processingStatus.classList.remove("is-error");
+    if (busy) {
+      if (elements.processingStatus.classList.contains("is-error")) {
+        elements.processingStatus.classList.remove("is-error");
+        if (errorClearTimer !== null) {
+          window.clearTimeout(errorClearTimer);
+          errorClearTimer = null;
+        }
+      }
+      elements.processingStatus.textContent = message ?? "處理中...";
+      return;
     }
-    elements.processingStatus.textContent = message
-      ? message
-      : "所有處理都在本機瀏覽器完成，不會上傳圖片。";
+    if (elements.processingStatus.classList.contains("is-error")) {
+      return;
+    }
+    elements.processingStatus.textContent = message ?? "所有處理都在本機瀏覽器完成，不會上傳圖片。";
   };
 
   const syncToolUi = () => {
@@ -1367,6 +1376,9 @@ export function createEditorController(elements: EditorElements): void {
   elements.downloadSlicesButton.addEventListener("click", exportSlices);
 
   window.addEventListener("keydown", (event) => {
+    if (event.repeat) {
+      return;
+    }
     const target = event.target as HTMLElement | null;
     if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.isContentEditable)) {
       return;
