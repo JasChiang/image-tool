@@ -162,6 +162,14 @@ const DEFAULT_SETTINGS: UiSettings = {
   showGrid: true
 };
 
+const TEMPLATE_PRESETS: Record<string, { label: string; width: number; height: number }> = {
+  "instagram-square": { label: "Instagram 正方形", width: 1080, height: 1080 },
+  "instagram-story": { label: "Instagram 限時動態", width: 1080, height: 1920 },
+  "youtube-thumbnail": { label: "YouTube 縮圖", width: 1280, height: 720 },
+  "xiaohongshu-vertical": { label: "小紅書直式", width: 1242, height: 1660 },
+  "shop-banner": { label: "電商橫幅", width: 1600, height: 900 }
+};
+
 const TOOL_CONFIG: Record<ToolId, {
   tool: EditorTool;
   label: string;
@@ -246,10 +254,22 @@ export function createEditorController(elements: EditorElements): void {
 
   hydrateUiFromSettings();
 
+  let errorClearTimer: number | null = null;
   const reportError = (error: unknown, fallbackMessage: string) => {
     console.error(error);
-    const message = error instanceof Error ? error.message : fallbackMessage;
-    window.alert(message);
+    const message = error instanceof Error && error.message ? error.message : fallbackMessage;
+    elements.processingStatus.textContent = `⚠ ${message}`;
+    elements.processingStatus.classList.add("is-error");
+    if (errorClearTimer !== null) {
+      window.clearTimeout(errorClearTimer);
+    }
+    errorClearTimer = window.setTimeout(() => {
+      elements.processingStatus.classList.remove("is-error");
+      if (!isBusy) {
+        elements.processingStatus.textContent = "所有處理都在本機瀏覽器完成，不會上傳圖片。";
+      }
+      errorClearTimer = null;
+    }, 6000);
   };
 
   const getActiveEntry = (): ImageEntry | null =>
@@ -306,6 +326,9 @@ export function createEditorController(elements: EditorElements): void {
   const setBusy = (busy: boolean, message?: string) => {
     isBusy = busy;
     elements.dropZone.classList.toggle("is-busy", busy);
+    if (busy && elements.processingStatus.classList.contains("is-error")) {
+      elements.processingStatus.classList.remove("is-error");
+    }
     elements.processingStatus.textContent = message
       ? message
       : "所有處理都在本機瀏覽器完成，不會上傳圖片。";
@@ -445,6 +468,8 @@ export function createEditorController(elements: EditorElements): void {
     elements.rotateRightButton.disabled = !hasImage || isBusy;
     elements.flipHorizontalButton.disabled = !hasImage || isBusy;
     elements.flipVerticalButton.disabled = !hasImage || isBusy;
+    elements.applyTemplateButton.disabled = !hasImage || isBusy;
+    elements.applyTemplateAllButton.disabled = images.length === 0 || isBusy;
     elements.downloadButton.disabled = !hasImage || isBusy;
     elements.downloadAllButton.disabled = images.length === 0 || isBusy;
     elements.addVerticalLineButton.disabled = !hasImage || isBusy;
@@ -763,8 +788,9 @@ export function createEditorController(elements: EditorElements): void {
     }
 
     try {
-      setBusy(true, "批次 ZIP 產生中...");
+      setBusy(true, `批次 ZIP 產生中 (0/${images.length})...`);
       const files: Array<{ name: string; data: Uint8Array }> = [];
+      let processed = 0;
 
       for (const entry of images) {
         const bitmap = entry.document.bitmap;
@@ -772,6 +798,8 @@ export function createEditorController(elements: EditorElements): void {
           continue;
         }
 
+        processed += 1;
+        setBusy(true, `批次 ZIP 產生中 (${processed}/${images.length})...`);
         const format = elements.exportFormat.value as ExportFormat;
         const blob = await exportBitmap(bitmap, format, Number(elements.exportQuality.value));
         files.push({
@@ -1261,6 +1289,49 @@ export function createEditorController(elements: EditorElements): void {
     });
   });
 
+  const getSelectedTemplate = () => TEMPLATE_PRESETS[elements.templatePreset.value] ?? null;
+
+  elements.applyTemplateButton.addEventListener("click", async () => {
+    const preset = getSelectedTemplate();
+    if (!preset) {
+      return;
+    }
+    await transformCurrentImage(
+      (bitmap) => fitBitmapToSize(bitmap, preset.width, preset.height),
+      { message: `套用「${preset.label}」中...` }
+    );
+  });
+
+  elements.applyTemplateAllButton.addEventListener("click", async () => {
+    const preset = getSelectedTemplate();
+    if (!preset || images.length === 0 || isBusy) {
+      return;
+    }
+
+    try {
+      let processed = 0;
+      setBusy(true, `批次套用「${preset.label}」(0/${images.length})...`);
+      for (const entry of images) {
+        const bitmap = entry.document.bitmap;
+        if (!bitmap) {
+          continue;
+        }
+        processed += 1;
+        setBusy(true, `批次套用「${preset.label}」(${processed}/${images.length})...`);
+        const canvas = fitBitmapToSize(bitmap, preset.width, preset.height);
+        await entry.document.replaceWith(canvas);
+        await updateThumbnail(entry);
+      }
+      clearSelections();
+      clearCutLines();
+    } catch (error) {
+      reportError(error, "批次套用模板失敗，請稍後再試。");
+    } finally {
+      setBusy(false);
+      render();
+    }
+  });
+
   elements.downloadButton.addEventListener("click", exportCurrent);
   elements.downloadAllButton.addEventListener("click", exportAll);
 
@@ -1294,6 +1365,59 @@ export function createEditorController(elements: EditorElements): void {
   });
 
   elements.downloadSlicesButton.addEventListener("click", exportSlices);
+
+  window.addEventListener("keydown", (event) => {
+    const target = event.target as HTMLElement | null;
+    if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.isContentEditable)) {
+      return;
+    }
+    if (isBusy) {
+      return;
+    }
+
+    const mod = event.metaKey || event.ctrlKey;
+
+    if (mod && event.key.toLowerCase() === "z" && !event.shiftKey) {
+      event.preventDefault();
+      if (!elements.undoButton.disabled) elements.undoButton.click();
+      return;
+    }
+    if ((mod && event.key.toLowerCase() === "z" && event.shiftKey) || (mod && event.key.toLowerCase() === "y")) {
+      event.preventDefault();
+      if (!elements.redoButton.disabled) elements.redoButton.click();
+      return;
+    }
+    if (mod && event.key.toLowerCase() === "s") {
+      event.preventDefault();
+      if (event.shiftKey) {
+        if (!elements.downloadAllButton.disabled) elements.downloadAllButton.click();
+      } else {
+        if (!elements.downloadButton.disabled) elements.downloadButton.click();
+      }
+      return;
+    }
+
+    if (event.key === "Escape") {
+      if (activePolygonPoints.length > 0) {
+        activePolygonPoints = [];
+        render();
+        return;
+      }
+      if (selections.length > 0 && !elements.clearSelectionButton.disabled) {
+        elements.clearSelectionButton.click();
+      }
+      return;
+    }
+    if ((event.key === "Delete" || event.key === "Backspace") && selections.length > 0) {
+      event.preventDefault();
+      if (!elements.removeLastSelectionButton.disabled) elements.removeLastSelectionButton.click();
+      return;
+    }
+    if (event.key === "Enter" && selections.length > 0 && !elements.applyButton.disabled) {
+      event.preventDefault();
+      elements.applyButton.click();
+    }
+  });
 
   window.addEventListener("resize", render);
   render();
@@ -1554,6 +1678,32 @@ function rotateBitmap(bitmap: ImageBitmap, degrees: 90 | -90): HTMLCanvasElement
   context.translate(canvas.width / 2, canvas.height / 2);
   context.rotate((degrees * Math.PI) / 180);
   context.drawImage(bitmap, -bitmap.width / 2, -bitmap.height / 2);
+  return canvas;
+}
+
+function fitBitmapToSize(
+  bitmap: ImageBitmap,
+  targetWidth: number,
+  targetHeight: number,
+  background = "#ffffff"
+): HTMLCanvasElement {
+  const canvas = document.createElement("canvas");
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("Canvas is not supported.");
+  }
+
+  context.fillStyle = background;
+  context.fillRect(0, 0, targetWidth, targetHeight);
+
+  const scale = Math.min(targetWidth / bitmap.width, targetHeight / bitmap.height);
+  const drawWidth = bitmap.width * scale;
+  const drawHeight = bitmap.height * scale;
+  const dx = (targetWidth - drawWidth) / 2;
+  const dy = (targetHeight - drawHeight) / 2;
+  context.drawImage(bitmap, dx, dy, drawWidth, drawHeight);
   return canvas;
 }
 

@@ -422,6 +422,11 @@ output {
   cursor: progress;
 }
 
+#processingStatus.is-error {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
 canvas {
   position: absolute;
   inset: 0;
