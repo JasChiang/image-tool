@@ -293,6 +293,14 @@ output {
   border-radius: 8px;
   padding: 12px;
   background: #ffffff;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+  cursor: default;
+}
+
+.selection-item:hover {
+  border-color: #f59e0b;
+  background: #fffbeb;
+  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.2);
 }
 
 .selection-item strong {
@@ -307,10 +315,20 @@ output {
 }
 
 .selection-remove-button {
-  min-height: 34px;
-  padding: 8px 12px;
-  border-color: #fecaca;
+  min-height: 30px;
+  min-width: 30px;
+  padding: 0;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
   color: #b91c1c;
+  font-size: 0.92rem;
+  line-height: 1;
+  border-radius: 6px;
+}
+
+.selection-remove-button:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
 }
 
 .checkbox-row {
@@ -520,12 +538,30 @@ output {
   grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
 }
 
+.image-card-wrap {
+  position: relative;
+}
+
 .image-card {
   display: grid;
   gap: 8px;
   padding: 8px;
   border-radius: 8px;
   text-align: left;
+  width: 100%;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  transition: box-shadow 0.12s ease, border-color 0.12s ease;
+}
+
+.image-card:hover {
+  border-color: #94a3b8;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+}
+
+.image-card.is-active {
+  border-color: #0f766e;
+  box-shadow: 0 2px 10px rgba(15, 118, 110, 0.22);
 }
 
 .image-card img {
@@ -537,13 +573,40 @@ output {
 }
 
 .image-card span {
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.84rem;
+  color: #475569;
 }
 
 .image-card-remove {
-  color: #b91c1c;
-  font-size: 0.84rem;
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.78);
+  color: #ffffff;
+  font-size: 0.75rem;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease, background 0.12s ease, transform 0.12s ease;
+}
+
+.image-card-wrap:hover .image-card-remove,
+.image-card-remove:focus-visible {
+  opacity: 1;
+}
+
+.image-card-remove:hover {
+  background: #b91c1c;
+  transform: scale(1.08);
 }
 
 .canvas-panel {
@@ -702,6 +765,13 @@ canvas {
 .workflow-steps .step-label {
   font-weight: 500;
   color: #1f2937;
+}
+
+.empty-cta {
+  margin: 8px auto 0;
+  font-size: 0.92rem;
+  color: #475569;
+  border-color: #cbd5e1;
 }
 
 @media (max-width: 1080px) {

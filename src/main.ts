@@ -6,6 +6,7 @@ const fileInput = document.querySelector<HTMLInputElement>("#fileInput");
 const helpButton = document.querySelector<HTMLButtonElement>("#helpButton");
 const helpDialog = document.querySelector<HTMLDialogElement>("#helpDialog");
 const helpCloseButton = document.querySelector<HTMLButtonElement>("#helpCloseButton");
+const loadSampleButton = document.querySelector<HTMLButtonElement>("#loadSampleButton");
 const canvasPanel = document.querySelector<HTMLElement>("#canvasPanel");
 const dropZone = document.querySelector<HTMLElement>("#dropZone");
 const emptyState = document.querySelector<HTMLElement>("#emptyState");
@@ -82,6 +83,7 @@ if (
   !helpButton ||
   !helpDialog ||
   !helpCloseButton ||
+  !loadSampleButton ||
   !canvasPanel ||
   !dropZone ||
   !emptyState ||
@@ -161,6 +163,7 @@ createEditorController({
   helpButton,
   helpDialog,
   helpCloseButton,
+  loadSampleButton,
   canvasPanel,
   dropZone,
   emptyState,

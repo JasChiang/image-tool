@@ -44,8 +44,13 @@ type SelectionInteraction =
       originalRect: Rect;
     };
 
+const isCoarsePointer = () => window.matchMedia("(pointer: coarse)").matches;
 const HANDLE_HIT_RADIUS_PX = 9;
 const HANDLE_DRAW_SIZE_PX = 9;
+const HANDLE_HIT_RADIUS_TOUCH_PX = 22;
+const HANDLE_DRAW_SIZE_TOUCH_PX = 14;
+const getHandleHitRadius = () => (isCoarsePointer() ? HANDLE_HIT_RADIUS_TOUCH_PX : HANDLE_HIT_RADIUS_PX);
+const getHandleDrawSize = () => (isCoarsePointer() ? HANDLE_DRAW_SIZE_TOUCH_PX : HANDLE_DRAW_SIZE_PX);
 
 type Viewport = {
   scale: number;
@@ -79,6 +84,7 @@ type EditorElements = {
   helpButton: HTMLButtonElement;
   helpDialog: HTMLDialogElement;
   helpCloseButton: HTMLButtonElement;
+  loadSampleButton: HTMLButtonElement;
   canvasPanel: HTMLElement;
   dropZone: HTMLElement;
   emptyState: HTMLElement;
@@ -257,6 +263,7 @@ export function createEditorController(elements: EditorElements): void {
   let isBusy = false;
   let activeToolId: ToolId = settings.activeToolId;
   let activePolygonPoints: Point[] = [];
+  let highlightedSelectionIndex: number | null = null;
 
   hydrateUiFromSettings();
 
@@ -408,14 +415,12 @@ export function createEditorController(elements: EditorElements): void {
         const label = getSelectionDisplayLabel(selection);
 
         return `
-          <div class="selection-item">
+          <div class="selection-item" data-highlight-index="${index}">
             <div>
               <strong>區域 ${index + 1} · ${label}</strong>
               <p>${x}, ${y} / ${width} × ${height}</p>
             </div>
-            <button type="button" class="selection-remove-button" data-selection-index="${index}">
-              刪除
-            </button>
+            <button type="button" class="selection-remove-button" data-selection-index="${index}" aria-label="刪除區域 ${index + 1}" title="刪除這個選區">✕</button>
           </div>
         `;
       })
@@ -436,13 +441,13 @@ export function createEditorController(elements: EditorElements): void {
       .map((entry) => {
         const isActive = entry.id === activeImageId;
         return `
-          <button type="button" class="image-card${isActive ? " is-active" : ""}" data-switch-image="${
-            entry.id
-          }">
-            <img src="${entry.thumbnailUrl}" alt="${escapeHtml(entry.name)} 的縮圖" />
-            <span>${escapeHtml(entry.name)}</span>
-            <span class="image-card-remove" data-remove-image="${entry.id}">移除</span>
-          </button>
+          <div class="image-card-wrap">
+            <button type="button" class="image-card${isActive ? " is-active" : ""}" data-switch-image="${entry.id}" title="切換到這張圖片">
+              <img src="${entry.thumbnailUrl}" alt="${escapeHtml(entry.name)} 的縮圖" />
+              <span>${escapeHtml(entry.name)}</span>
+            </button>
+            <span role="button" tabindex="0" class="image-card-remove" data-remove-image="${entry.id}" aria-label="移除 ${escapeHtml(entry.name)}" title="從清單移除這張圖片">✕</span>
+          </div>
         `;
       })
       .join("");
@@ -542,7 +547,13 @@ export function createEditorController(elements: EditorElements): void {
 
     if (mode === "edit") {
       selections.forEach((selection, index) => {
-        drawSelectionShape(context, selection, viewport, { label: String(index + 1) });
+        const isHighlighted = index === highlightedSelectionIndex;
+        drawSelectionShape(context, selection, viewport, {
+          label: String(index + 1),
+          stroke: isHighlighted ? "#f59e0b" : "#0ea5e9",
+          fill: isHighlighted ? "rgba(245, 158, 11, 0.24)" : "rgba(56, 189, 248, 0.18)",
+          lineWidth: isHighlighted ? 3 : 2
+        });
         if (selection.kind === "rect") {
           drawResizeHandles(context, selection.rect, viewport);
         }
@@ -884,6 +895,35 @@ export function createEditorController(elements: EditorElements): void {
   };
   elements.helpButton.addEventListener("click", openHelp);
   elements.helpCloseButton.addEventListener("click", closeHelp);
+
+  elements.loadSampleButton.addEventListener("click", async () => {
+    if (isBusy) {
+      return;
+    }
+    try {
+      setBusy(true, "載入範例圖片中...");
+      const sampleFile = await createSampleImageFile();
+      const dt = new DataTransfer();
+      dt.items.add(sampleFile);
+      setBusy(false);
+      await addFiles(dt.files);
+    } catch (error) {
+      setBusy(false);
+      reportError(error, "載入範例失敗，請改用拖入。");
+    }
+  });
+
+  const HELP_SEEN_KEY = "image-tool-help-seen-v1";
+  if (typeof window.localStorage !== "undefined" && !localStorage.getItem(HELP_SEEN_KEY)) {
+    window.setTimeout(() => {
+      openHelp();
+      try {
+        localStorage.setItem(HELP_SEEN_KEY, "1");
+      } catch (error) {
+        console.warn("無法寫入 localStorage", error);
+      }
+    }, 600);
+  }
   elements.helpDialog.addEventListener("click", (event) => {
     if (event.target === elements.helpDialog) {
       closeHelp();
@@ -1069,6 +1109,30 @@ export function createEditorController(elements: EditorElements): void {
     const index = Number(button.dataset.selectionIndex);
     if (!Number.isNaN(index)) {
       removeSelectionAt(index);
+    }
+  });
+
+  elements.selectionList.addEventListener("mouseover", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    const item = target.closest<HTMLElement>("[data-highlight-index]");
+    if (!item) {
+      return;
+    }
+    const index = Number(item.dataset.highlightIndex);
+    if (Number.isNaN(index) || index === highlightedSelectionIndex) {
+      return;
+    }
+    highlightedSelectionIndex = index;
+    render();
+  });
+
+  elements.selectionList.addEventListener("mouseleave", () => {
+    if (highlightedSelectionIndex !== null) {
+      highlightedSelectionIndex = null;
+      render();
     }
   });
 
@@ -2131,7 +2195,7 @@ function findHandleAt(
   selections: SelectionShape[],
   viewport: Viewport
 ): { selectionId: string; handle: ResizeHandle; rect: Rect } | null {
-  const toleranceImage = HANDLE_HIT_RADIUS_PX / viewport.scale;
+  const toleranceImage = getHandleHitRadius() / viewport.scale;
   for (let index = selections.length - 1; index >= 0; index -= 1) {
     const selection = selections[index];
     if (selection.kind !== "rect") {
@@ -2243,7 +2307,8 @@ function applyRectResize(
 }
 
 function drawResizeHandles(context: CanvasRenderingContext2D, rect: Rect, viewport: Viewport): void {
-  const half = HANDLE_DRAW_SIZE_PX / 2;
+  const size = getHandleDrawSize();
+  const half = size / 2;
   context.save();
   context.fillStyle = "#ffffff";
   context.strokeStyle = "#0ea5e9";
@@ -2253,8 +2318,8 @@ function drawResizeHandles(context: CanvasRenderingContext2D, rect: Rect, viewpo
     const point = getHandleImagePosition(rect, handle);
     const screenX = point.x * viewport.scale + viewport.offsetX;
     const screenY = point.y * viewport.scale + viewport.offsetY;
-    context.fillRect(screenX - half, screenY - half, HANDLE_DRAW_SIZE_PX, HANDLE_DRAW_SIZE_PX);
-    context.strokeRect(screenX - half, screenY - half, HANDLE_DRAW_SIZE_PX, HANDLE_DRAW_SIZE_PX);
+    context.fillRect(screenX - half, screenY - half, size, size);
+    context.strokeRect(screenX - half, screenY - half, size, size);
   }
   context.restore();
 }
@@ -2274,6 +2339,76 @@ function cursorForHandle(handle: ResizeHandle): string {
     case "w":
       return "ew-resize";
   }
+}
+
+async function createSampleImageFile(): Promise<File> {
+  const width = 1200;
+  const height = 800;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("Canvas is not supported.");
+  }
+
+  const grad = ctx.createLinearGradient(0, 0, width, height);
+  grad.addColorStop(0, "#0f172a");
+  grad.addColorStop(1, "#1e293b");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "600 36px system-ui, sans-serif";
+  ctx.fillText("會員資料卡（範例）", 80, 90);
+
+  ctx.fillStyle = "#cbd5e1";
+  ctx.font = "20px system-ui, sans-serif";
+  ctx.fillText("這是練習用的範例 — 試著框選下方資訊並套用遮蔽效果", 80, 130);
+
+  const rows: Array<[string, string]> = [
+    ["姓名", "陳小華 / Hua Chen"],
+    ["手機", "+886 912-345-678"],
+    ["電子郵件", "huachen@example.com"],
+    ["身分證", "A1234-56789"],
+    ["地址", "台北市信義區範例路 123 號 4 樓"],
+    ["信用卡", "4532 •••• •••• 9821"]
+  ];
+
+  ctx.font = "600 24px system-ui, sans-serif";
+  rows.forEach(([label, value], index) => {
+    const y = 220 + index * 64;
+    ctx.fillStyle = "#94a3b8";
+    ctx.fillText(label, 80, y);
+    ctx.fillStyle = "#f8fafc";
+    ctx.fillText(value, 280, y);
+  });
+
+  ctx.fillStyle = "#fef3c7";
+  ctx.fillRect(820, 220, 300, 200);
+  ctx.fillStyle = "#1f2937";
+  ctx.font = "600 22px system-ui, sans-serif";
+  ctx.fillText("訂單編號 #4837", 845, 260);
+  ctx.font = "32px system-ui, sans-serif";
+  ctx.fillText("NT$ 12,800", 845, 310);
+  ctx.font = "18px system-ui, sans-serif";
+  ctx.fillStyle = "#475569";
+  ctx.fillText("2026-05-28", 845, 345);
+
+  ctx.fillStyle = "#0f766e";
+  ctx.font = "600 20px system-ui, sans-serif";
+  ctx.fillText("🔒 處理全部在你的瀏覽器內完成", 80, height - 60);
+
+  const blob: Blob = await new Promise((resolve, reject) => {
+    canvas.toBlob((result) => {
+      if (result) {
+        resolve(result);
+      } else {
+        reject(new Error("Sample blob 生成失敗"));
+      }
+    }, "image/png");
+  });
+  return new File([blob], "sample-會員資料卡.png", { type: "image/png" });
 }
 
 function escapeHtml(value: string): string {
