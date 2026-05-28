@@ -34,8 +34,13 @@ const effectStrengthLabel = document.querySelector<HTMLLabelElement>("#effectStr
 const cellSize = document.querySelector<HTMLInputElement>("#cellSize");
 const cellSizeValue = document.querySelector<HTMLOutputElement>("#cellSizeValue");
 const effectHint = document.querySelector<HTMLElement>("#effectHint");
+const effectStrengthGroup = document.querySelector<HTMLElement>("#effectStrengthGroup");
 const coverColorGroup = document.querySelector<HTMLElement>("#coverColorGroup");
 const coverColor = document.querySelector<HTMLInputElement>("#coverColor");
+const eyedropperButton = document.querySelector<HTMLButtonElement>("#eyedropperButton");
+const cropRatio = document.querySelector<HTMLSelectElement>("#cropRatio");
+const copyToClipboardButton = document.querySelector<HTMLButtonElement>("#copyToClipboardButton");
+const applyButtonLabel = document.querySelector<HTMLElement>("#applyButton .primary-action-label");
 const exportName = document.querySelector<HTMLInputElement>("#exportName");
 const exportFormat = document.querySelector<HTMLSelectElement>("#exportFormat");
 const exportQuality = document.querySelector<HTMLInputElement>("#exportQuality");
@@ -108,6 +113,11 @@ if (
   !blackoutToolButton ||
   !coverToolButton ||
   !effectStrengthLabel ||
+  !effectStrengthGroup ||
+  !eyedropperButton ||
+  !cropRatio ||
+  !copyToClipboardButton ||
+  !applyButtonLabel ||
   !cellSize ||
   !cellSizeValue ||
   !effectHint ||
@@ -188,6 +198,11 @@ createEditorController({
   blackoutToolButton,
   coverToolButton,
   effectStrengthLabel,
+  effectStrengthGroup,
+  eyedropperButton,
+  cropRatio,
+  copyToClipboardButton,
+  applyButtonLabel,
   cellSize,
   cellSizeValue,
   effectHint,

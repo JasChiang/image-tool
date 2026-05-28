@@ -68,27 +68,26 @@
               <button id="coverToolButton" class="mini-tab" type="button" title="可自選顏色覆蓋">純色</button>
             </div>
 
-            <div class="control-group">
+            <div class="inline-control" id="effectStrengthGroup">
               <label id="effectStrengthLabel" for="cellSize">馬賽克格子</label>
-              <div class="range-row">
-                <input id="cellSize" type="range" min="4" max="80" value="18" />
-                <output id="cellSizeValue" for="cellSize">18 px</output>
-              </div>
-              <p id="effectHint" class="helper-text">拖曳多個區域後，一次套用像素化遮蔽。</p>
+              <input id="cellSize" type="range" min="4" max="80" value="18" />
+              <output id="cellSizeValue" for="cellSize">18 px</output>
             </div>
+            <p id="effectHint" class="helper-text" hidden></p>
 
-            <div id="coverColorGroup" class="control-group" hidden>
+            <div id="coverColorGroup" class="inline-control color-control" hidden>
               <label for="coverColor">遮蓋顏色</label>
               <input id="coverColor" type="color" value="#111827" />
-            </div>
-
-            <div class="selection-status">
-              <span>已選取區域</span>
-              <strong id="selectionCount">0</strong>
+              <button id="eyedropperButton" type="button" class="ghost-button icon-button" title="從圖片上取色（如果瀏覽器支援）" aria-label="取色">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 3a3 3 0 1 1 2 5l-2 2 2 2-4 4-2-2-7 7H4v-4l7-7-2-2 4-4 2 2 2-2z"/></svg>
+              </button>
             </div>
 
             <div class="apply-row">
-              <button id="applyButton" class="primary-action" type="button" disabled title="把目前選的遮蔽效果套用到所有選區 (Enter)">套用全部馬賽克</button>
+              <button id="applyButton" class="primary-action" type="button" disabled title="把目前選的遮蔽效果套用到所有選區 (Enter)">
+                <span class="primary-action-label">套用全部馬賽克</span>
+                <span class="primary-action-count" id="selectionCount" hidden>0</span>
+              </button>
               <div class="action-grid action-grid-secondary">
                 <button id="removeLastSelectionButton" type="button" disabled title="刪除最新的一個選區 (Backspace / Delete)">刪除最後一個</button>
                 <button id="clearSelectionButton" type="button" disabled title="清除所有選區 (Esc)">清除全部選取</button>
@@ -103,25 +102,38 @@
               <div id="selectionList" class="selection-list" aria-live="polite"></div>
             </div>
 
-            <div class="control-group">
-              <label class="checkbox-row">
-                <input id="compareToggle" type="checkbox" />
-                顯示原圖比較
-              </label>
-            </div>
-
             <details class="collapsible-section">
               <summary>
                 <span class="collapsible-title">圖片整理</span>
                 <span class="collapsible-hint">裁切 · 旋轉 · 翻轉</span>
               </summary>
               <div class="collapsible-body">
+                <div class="inline-control">
+                  <label for="cropRatio">裁切比例</label>
+                  <select id="cropRatio">
+                    <option value="free">自由（用最後選區）</option>
+                    <option value="1:1">1:1 方形</option>
+                    <option value="4:3">4:3 橫式</option>
+                    <option value="16:9">16:9 寬螢幕</option>
+                    <option value="9:16">9:16 直式</option>
+                    <option value="3:4">3:4 直式</option>
+                  </select>
+                </div>
                 <div class="action-grid transform-grid">
-                  <button id="cropButton" type="button" disabled title="把圖片裁切成最後一個選區的範圍">裁成最後選區</button>
+                  <button id="cropButton" type="button" disabled title="依選定比例裁切，自由模式則用最後一個選區">裁切</button>
                   <button id="rotateLeftButton" type="button" disabled title="逆時針旋轉 90 度">左轉 90°</button>
                   <button id="rotateRightButton" type="button" disabled title="順時針旋轉 90 度">右轉 90°</button>
                   <button id="flipHorizontalButton" type="button" disabled title="左右翻轉（鏡像）">水平翻轉</button>
                   <button id="flipVerticalButton" type="button" disabled title="上下翻轉">垂直翻轉</button>
+                </div>
+                <label class="checkbox-row">
+                  <input id="compareToggle" type="checkbox" />
+                  按住顯示原圖比較
+                </label>
+                <div class="inline-control">
+                  <label for="workspaceSize">畫面縮放</label>
+                  <input id="workspaceSize" type="range" min="45" max="100" value="100" />
+                  <output id="workspaceSizeValue" for="workspaceSize">100%</output>
                 </div>
               </div>
             </details>
@@ -157,10 +169,19 @@
               </div>
             </details>
 
-            <div class="action-grid history-grid">
-              <button id="undoButton" type="button" disabled title="復原上一步 (Cmd/Ctrl+Z)">復原</button>
-              <button id="redoButton" type="button" disabled title="重做 (Cmd/Ctrl+Shift+Z 或 Cmd/Ctrl+Y)">重做</button>
-              <button id="resetButton" type="button" disabled title="把目前圖片還原到一開始載入的狀態">重置圖片</button>
+            <div class="history-row">
+              <button id="undoButton" type="button" class="icon-button history-button" disabled title="復原上一步 (Cmd/Ctrl+Z)" aria-label="復原">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h12a4 4 0 0 1 4 4v0a4 4 0 0 1-4 4h-7"/></svg>
+                <span>復原</span>
+              </button>
+              <button id="redoButton" type="button" class="icon-button history-button" disabled title="重做 (Cmd/Ctrl+Shift+Z)" aria-label="重做">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14l5-5-5-5"/><path d="M20 9H8a4 4 0 0 0-4 4v0a4 4 0 0 0 4 4h7"/></svg>
+                <span>重做</span>
+              </button>
+              <button id="resetButton" type="button" class="icon-button history-button" disabled title="把圖片還原到一開始" aria-label="重置">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
+                <span>重置</span>
+              </button>
             </div>
           </section>
 
@@ -201,48 +222,40 @@
             </div>
           </section>
 
-          <section class="section-block export-panel">
-            <div class="section-heading">
-              <span>輸出</span>
-              <span id="processingStatus">所有處理都在本機瀏覽器完成，不會上傳圖片。</span>
-            </div>
+          <details id="exportPanel" class="collapsible-section export-panel" open>
+            <summary>
+              <span class="collapsible-title">輸出</span>
+              <span id="processingStatus" class="collapsible-hint">所有處理都在本機完成，不會上傳。</span>
+            </summary>
+            <div class="collapsible-body">
+              <div class="inline-control">
+                <label for="exportName">檔名</label>
+                <input id="exportName" type="text" value="image" />
+              </div>
 
-            <div class="control-group">
-              <label for="exportName">下載檔名</label>
-              <input id="exportName" type="text" value="image" />
-            </div>
+              <div class="inline-control">
+                <label for="exportFormat">格式</label>
+                <select id="exportFormat">
+                  <option value="png">PNG</option>
+                  <option value="jpeg">JPEG</option>
+                  <option value="webp">WebP</option>
+                  <option value="pdf">PDF</option>
+                </select>
+              </div>
 
-            <div class="control-group">
-              <label for="exportFormat">輸出格式</label>
-              <select id="exportFormat">
-                <option value="png">PNG</option>
-                <option value="jpeg">JPEG</option>
-                <option value="webp">WebP</option>
-                <option value="pdf">PDF</option>
-              </select>
-            </div>
-
-            <div class="control-group">
-              <label for="exportQuality">品質</label>
-              <div class="range-row">
+              <div class="inline-control" id="exportQualityGroup">
+                <label for="exportQuality">品質</label>
                 <input id="exportQuality" type="range" min="40" max="100" value="92" />
                 <output id="exportQualityValue" for="exportQuality">92%</output>
               </div>
-            </div>
 
-            <div class="control-group">
-              <label for="workspaceSize">工作區大小</label>
-              <div class="range-row">
-                <input id="workspaceSize" type="range" min="45" max="100" value="100" />
-                <output id="workspaceSizeValue" for="workspaceSize">100%</output>
+              <div class="action-grid">
+                <button id="downloadButton" class="primary-action" type="button" disabled title="下載目前正在編輯的這張圖片 (Cmd/Ctrl+S)">下載目前圖片</button>
+                <button id="copyToClipboardButton" type="button" disabled title="複製到剪貼簿，直接 Cmd/Ctrl+V 貼到任何地方">複製到剪貼簿</button>
+                <button id="downloadAllButton" type="button" disabled title="把所有圖片打包成一個 ZIP 下載 (Cmd/Ctrl+Shift+S)">批次下載 ZIP</button>
               </div>
             </div>
-
-            <div class="action-grid">
-              <button id="downloadButton" type="button" disabled title="下載目前正在編輯的這張圖片 (Cmd/Ctrl+S)">下載目前圖片</button>
-              <button id="downloadAllButton" type="button" disabled title="把所有圖片打包成一個 ZIP 下載 (Cmd/Ctrl+Shift+S)">批次下載 ZIP</button>
-            </div>
-          </section>
+          </details>
         </aside>
 
         <section class="stage-layout" aria-label="圖片工作區">

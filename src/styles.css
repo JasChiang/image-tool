@@ -138,8 +138,8 @@ button:disabled {
 .controls {
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding: 20px;
+  gap: 12px;
+  padding: 16px;
   background: #eef4f8;
   border-right: 1px solid #d9e2ec;
   overflow-y: auto;
@@ -176,7 +176,77 @@ button:disabled {
 
 .tool-panel {
   display: grid;
-  gap: 16px;
+  gap: 10px;
+}
+
+.inline-control {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+  font-size: 0.92rem;
+}
+
+.inline-control label {
+  font-weight: 600;
+  color: #475569;
+  font-size: 0.86rem;
+  white-space: nowrap;
+}
+
+.inline-control input[type="range"] {
+  width: 100%;
+}
+
+.inline-control input[type="text"],
+.inline-control select {
+  grid-column: 2 / span 2;
+  padding: 8px 10px;
+  font-size: 0.92rem;
+}
+
+.inline-control output {
+  text-align: right;
+  font-size: 0.84rem;
+  min-width: 48px;
+}
+
+.color-control input[type="color"] {
+  grid-column: 2 / span 1;
+  min-height: 36px;
+}
+
+.color-control .icon-button {
+  grid-column: 3;
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 10px;
+  min-height: 36px;
+  background: #ffffff;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+  font-size: 0.86rem;
+  border-radius: 8px;
+}
+
+.icon-button:hover:not(:disabled) {
+  border-color: #94a3b8;
+  color: #1f2937;
+}
+
+.history-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.history-button {
+  font-weight: 500;
 }
 
 .tool-panel[hidden] {
@@ -355,16 +425,35 @@ output {
 
 .primary-action {
   width: 100%;
-  min-height: 48px;
-  padding: 12px 18px;
+  min-height: 42px;
+  padding: 10px 14px;
   border: 1px solid #0f766e;
   background: linear-gradient(135deg, #0f766e, #115e59);
   color: #ffffff;
   font-weight: 600;
-  font-size: 0.98rem;
+  font-size: 0.94rem;
   border-radius: 10px;
   box-shadow: 0 4px 12px rgba(15, 118, 110, 0.22);
   transition: transform 0.08s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.primary-action-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0;
 }
 
 .primary-action:hover:not(:disabled) {
@@ -381,12 +470,12 @@ output {
 }
 
 .action-grid-secondary button {
-  min-height: 36px;
-  padding: 8px 12px;
+  min-height: 32px;
+  padding: 6px 10px;
   background: #ffffff;
   color: #475569;
   border: 1px solid #cbd5e1;
-  font-size: 0.88rem;
+  font-size: 0.84rem;
   font-weight: 500;
 }
 

@@ -109,11 +109,16 @@ type EditorElements = {
   blackoutToolButton: HTMLButtonElement;
   coverToolButton: HTMLButtonElement;
   effectStrengthLabel: HTMLLabelElement;
+  effectStrengthGroup: HTMLElement;
   cellSize: HTMLInputElement;
   cellSizeValue: HTMLOutputElement;
   effectHint: HTMLElement;
   coverColorGroup: HTMLElement;
   coverColor: HTMLInputElement;
+  eyedropperButton: HTMLButtonElement;
+  cropRatio: HTMLSelectElement;
+  copyToClipboardButton: HTMLButtonElement;
+  applyButtonLabel: HTMLElement;
   exportName: HTMLInputElement;
   exportFormat: HTMLSelectElement;
   exportQuality: HTMLInputElement;
@@ -364,9 +369,9 @@ export function createEditorController(elements: EditorElements): void {
     elements.blackoutToolButton.classList.toggle("is-active", activeToolId === "blackout");
     elements.coverToolButton.classList.toggle("is-active", activeToolId === "cover");
     elements.effectStrengthLabel.textContent = config.label;
-    elements.effectHint.textContent = config.hint;
-    elements.applyButton.textContent = config.buttonLabel;
+    elements.applyButtonLabel.textContent = config.buttonLabel;
     elements.coverColorGroup.hidden = activeToolId !== "cover";
+    elements.effectStrengthGroup.hidden = !config.usesStrength;
 
     if (config.usesStrength) {
       const strength = settings.strengthValues[activeToolId as "mosaic" | "blur"] ?? config.defaultValue;
@@ -375,10 +380,6 @@ export function createEditorController(elements: EditorElements): void {
       elements.cellSize.max = String(config.max);
       elements.cellSize.value = String(strength);
       elements.cellSizeValue.value = `${strength} ${config.suffix}`;
-    } else {
-      elements.cellSize.disabled = true;
-      elements.cellSize.value = String(config.defaultValue);
-      elements.cellSizeValue.value = config.suffix;
     }
   };
 
@@ -472,7 +473,8 @@ export function createEditorController(elements: EditorElements): void {
     const hasSelection = selections.length > 0;
     const hasDraftSelection = draftSelection !== null;
     const hasCutLines = verticalLines.length + horizontalLines.length > 0;
-    const canCrop = hasImage && selections.length > 0;
+    const lockedRatio = elements.cropRatio.value !== "free";
+    const canCrop = hasImage && (lockedRatio || selections.length > 0);
 
     elements.emptyState.hidden = hasImage;
     elements.editTab.classList.toggle("is-active", mode === "edit");
@@ -494,6 +496,7 @@ export function createEditorController(elements: EditorElements): void {
     elements.applyTemplateButton.disabled = !hasImage || isBusy;
     elements.applyTemplateAllButton.disabled = images.length === 0 || isBusy;
     elements.downloadButton.disabled = !hasImage || isBusy;
+    elements.copyToClipboardButton.disabled = !hasImage || isBusy;
     elements.downloadAllButton.disabled = images.length === 0 || isBusy;
     elements.addVerticalLineButton.disabled = !hasImage || isBusy;
     elements.addHorizontalLineButton.disabled = !hasImage || isBusy;
@@ -503,6 +506,7 @@ export function createEditorController(elements: EditorElements): void {
     elements.clearCutLinesButton.disabled = !hasCutLines || isBusy;
     elements.downloadSlicesButton.disabled = !hasImage || !hasCutLines || isBusy;
     elements.selectionCount.textContent = String(selections.length);
+    elements.selectionCount.hidden = selections.length === 0;
     elements.verticalLineCount.textContent = String(verticalLines.length);
     elements.horizontalLineCount.textContent = String(horizontalLines.length);
     elements.sliceCount.textContent = String((verticalLines.length + 1) * (horizontalLines.length + 1));
@@ -1075,6 +1079,16 @@ export function createEditorController(elements: EditorElements): void {
     render();
   });
 
+  const updateCropButtonLabel = () => {
+    const ratio = elements.cropRatio.value;
+    elements.cropButton.textContent = ratio === "free" ? "裁成最後選區" : `裁切成 ${ratio}`;
+  };
+  updateCropButtonLabel();
+  elements.cropRatio.addEventListener("change", () => {
+    updateCropButtonLabel();
+    render();
+  });
+
   elements.exportQuality.addEventListener("input", () => {
     saveSettings();
     render();
@@ -1384,15 +1398,75 @@ export function createEditorController(elements: EditorElements): void {
   });
 
   elements.cropButton.addEventListener("click", async () => {
-    const lastSelection = selections.at(-1);
-    if (!lastSelection) {
+    const bitmap = getCurrentBitmap();
+    if (!bitmap) {
       return;
     }
-
-    const cropRect = getSelectionBounds(lastSelection);
-    await transformCurrentImage((bitmap) => cropBitmap(bitmap, cropRect), {
+    const ratio = elements.cropRatio.value;
+    let cropRect: Rect;
+    if (ratio === "free") {
+      const lastSelection = selections.at(-1);
+      if (!lastSelection) {
+        reportError(new Error("自由模式請先在圖上框出選區"), "");
+        return;
+      }
+      cropRect = getSelectionBounds(lastSelection);
+    } else {
+      cropRect = centeredCropForRatio(bitmap.width, bitmap.height, ratio);
+    }
+    await transformCurrentImage((b) => cropBitmap(b, cropRect), {
       message: "裁切圖片中..."
     });
+  });
+
+  elements.copyToClipboardButton.addEventListener("click", async () => {
+    const bitmap = getCurrentBitmap();
+    if (!bitmap || isBusy) {
+      return;
+    }
+    if (typeof window.ClipboardItem === "undefined" || !navigator.clipboard?.write) {
+      reportError(new Error("這個瀏覽器不支援複製圖片到剪貼簿，請改用「下載」"), "");
+      return;
+    }
+    try {
+      setBusy(true, "複製到剪貼簿中...");
+      const canvas = document.createElement("canvas");
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        throw new Error("Canvas not supported");
+      }
+      ctx.drawImage(bitmap, 0, 0);
+      const blob: Blob = await new Promise((resolve, reject) =>
+        canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("blob fail"))), "image/png")
+      );
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+      setBusy(false, "✓ 已複製到剪貼簿，可在其他地方 Cmd/Ctrl+V 貼上");
+      window.setTimeout(() => {
+        if (!isBusy && !elements.processingStatus.classList.contains("is-error")) {
+          elements.processingStatus.textContent = "所有處理都在本機瀏覽器完成，不會上傳圖片。";
+        }
+      }, 3500);
+    } catch (error) {
+      setBusy(false);
+      reportError(error, "複製失敗，請改用下載。");
+    }
+  });
+
+  elements.eyedropperButton.addEventListener("click", async () => {
+    const EyeDropperCtor = (window as unknown as { EyeDropper?: new () => { open: () => Promise<{ sRGBHex: string }> } }).EyeDropper;
+    if (!EyeDropperCtor) {
+      reportError(new Error("這個瀏覽器不支援取色器（請用 Chrome / Edge）"), "");
+      return;
+    }
+    try {
+      const result = await new EyeDropperCtor().open();
+      elements.coverColor.value = result.sRGBHex;
+      elements.coverColor.dispatchEvent(new Event("change", { bubbles: true }));
+    } catch {
+      // user cancelled — no-op
+    }
   });
 
   elements.rotateLeftButton.addEventListener("click", async () => {
@@ -1874,6 +1948,30 @@ function fitBitmapToSize(
   const dy = (targetHeight - drawHeight) / 2;
   context.drawImage(bitmap, dx, dy, drawWidth, drawHeight);
   return canvas;
+}
+
+function centeredCropForRatio(width: number, height: number, ratio: string): Rect {
+  const [rw, rh] = ratio.split(":").map(Number);
+  if (!rw || !rh) {
+    return { x: 0, y: 0, width, height };
+  }
+  const targetAspect = rw / rh;
+  const currentAspect = width / height;
+  let newWidth: number;
+  let newHeight: number;
+  if (currentAspect > targetAspect) {
+    newHeight = height;
+    newWidth = height * targetAspect;
+  } else {
+    newWidth = width;
+    newHeight = width / targetAspect;
+  }
+  return {
+    x: (width - newWidth) / 2,
+    y: (height - newHeight) / 2,
+    width: newWidth,
+    height: newHeight
+  };
 }
 
 function flipBitmap(bitmap: ImageBitmap, axis: "horizontal" | "vertical"): HTMLCanvasElement {
