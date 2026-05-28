@@ -4,7 +4,6 @@ import {
   getSelectionBounds,
   getSelectionDisplayLabel,
   normalizeRect,
-  rectHasArea,
   selectionHasArea,
   selectionToRects,
   type Point,
@@ -25,6 +24,28 @@ type EditorMode = "edit" | "slice";
 type PendingCutLine = "vertical" | "horizontal" | null;
 type ToolId = "mosaic" | "blur" | "blackout" | "cover";
 type SelectionMode = "rect" | "brush" | "polygon";
+
+type ResizeHandle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
+
+type SelectionInteraction =
+  | { kind: "idle" }
+  | { kind: "creating" }
+  | {
+      kind: "moving";
+      selectionId: string;
+      pointerStart: Point;
+      originalSelection: SelectionShape;
+    }
+  | {
+      kind: "resizing";
+      selectionId: string;
+      handle: ResizeHandle;
+      pointerStart: Point;
+      originalRect: Rect;
+    };
+
+const HANDLE_HIT_RADIUS_PX = 9;
+const HANDLE_DRAW_SIZE_PX = 9;
 
 type Viewport = {
   scale: number;
@@ -141,14 +162,6 @@ const DEFAULT_SETTINGS: UiSettings = {
   showGrid: true
 };
 
-const TEMPLATE_PRESETS = {
-  "instagram-square": { label: "Instagram 正方形", width: 1080, height: 1080 },
-  "instagram-story": { label: "Instagram 限時動態", width: 1080, height: 1920 },
-  "youtube-thumbnail": { label: "YouTube 縮圖", width: 1280, height: 720 },
-  "xiaohongshu-vertical": { label: "小紅書直式", width: 1242, height: 1660 },
-  "shop-banner": { label: "電商橫幅", width: 1600, height: 900 }
-} as const;
-
 const TOOL_CONFIG: Record<ToolId, {
   tool: EditorTool;
   label: string;
@@ -219,6 +232,7 @@ export function createEditorController(elements: EditorElements): void {
   let selections: SelectionShape[] = [];
   let draftSelection: SelectionShape | null = null;
   let dragStart: Point | null = null;
+  let interaction: SelectionInteraction = { kind: "idle" };
   let mode: EditorMode = "edit";
   let selectionMode: SelectionMode = settings.selectionMode;
   let pendingCutLine: PendingCutLine = null;
@@ -486,6 +500,9 @@ export function createEditorController(elements: EditorElements): void {
     if (mode === "edit") {
       selections.forEach((selection, index) => {
         drawSelectionShape(context, selection, viewport, { label: String(index + 1) });
+        if (selection.kind === "rect") {
+          drawResizeHandles(context, selection.rect, viewport);
+        }
       });
 
       if (draftSelection && selectionHasArea(draftSelection)) {
@@ -517,6 +534,23 @@ export function createEditorController(elements: EditorElements): void {
     }
 
     updateControls();
+  };
+
+  const updateHoverCursor = (point: Point) => {
+    if (mode !== "edit" || selectionMode === "polygon" || isBusy) {
+      elements.canvas.style.cursor = "";
+      return;
+    }
+    const handleHit = findHandleAt(point, selections, viewport);
+    if (handleHit) {
+      elements.canvas.style.cursor = cursorForHandle(handleHit.handle);
+      return;
+    }
+    if (findSelectionAt(point, selections)) {
+      elements.canvas.style.cursor = "move";
+      return;
+    }
+    elements.canvas.style.cursor = "";
   };
 
   const updateThumbnail = async (entry: ImageEntry) => {
@@ -962,6 +996,34 @@ export function createEditorController(elements: EditorElements): void {
       return;
     }
 
+    const handleHit = findHandleAt(point, selections, viewport);
+    if (handleHit) {
+      interaction = {
+        kind: "resizing",
+        selectionId: handleHit.selectionId,
+        handle: handleHit.handle,
+        pointerStart: point,
+        originalRect: handleHit.rect
+      };
+      elements.canvas.setPointerCapture(event.pointerId);
+      render();
+      return;
+    }
+
+    const selectionHit = findSelectionAt(point, selections);
+    if (selectionHit) {
+      interaction = {
+        kind: "moving",
+        selectionId: selectionHit.id,
+        pointerStart: point,
+        originalSelection: selectionHit
+      };
+      elements.canvas.setPointerCapture(event.pointerId);
+      render();
+      return;
+    }
+
+    interaction = { kind: "creating" };
     dragStart = point;
     if (selectionMode === "rect") {
       draftSelection = {
@@ -983,11 +1045,45 @@ export function createEditorController(elements: EditorElements): void {
 
   elements.canvas.addEventListener("pointermove", (event) => {
     const bitmap = getDisplayBitmap();
-    if (!bitmap || !dragStart || isBusy) {
+    if (!bitmap || isBusy) {
       return;
     }
 
     const point = toImagePoint(event, elements.canvas, viewport);
+
+    if (interaction.kind === "moving") {
+      const dx = point.x - interaction.pointerStart.x;
+      const dy = point.y - interaction.pointerStart.y;
+      const targetId = interaction.selectionId;
+      const original = interaction.originalSelection;
+      selections = selections.map((selection) =>
+        selection.id === targetId ? translateSelection(original, dx, dy, bitmap.width, bitmap.height) : selection
+      );
+      render();
+      return;
+    }
+
+    if (interaction.kind === "resizing") {
+      const dx = point.x - interaction.pointerStart.x;
+      const dy = point.y - interaction.pointerStart.y;
+      const targetId = interaction.selectionId;
+      const newRect = applyRectResize(interaction.originalRect, interaction.handle, dx, dy, bitmap.width, bitmap.height);
+      selections = selections.map((selection) =>
+        selection.id === targetId && selection.kind === "rect" ? { ...selection, rect: newRect } : selection
+      );
+      render();
+      return;
+    }
+
+    if (interaction.kind === "idle") {
+      updateHoverCursor(point);
+      return;
+    }
+
+    if (!dragStart) {
+      return;
+    }
+
     if (selectionMode === "rect") {
       draftSelection = {
         id: draftSelection?.id ?? crypto.randomUUID(),
@@ -1007,12 +1103,23 @@ export function createEditorController(elements: EditorElements): void {
     if (isBusy) {
       return;
     }
+
+    if (interaction.kind === "moving" || interaction.kind === "resizing") {
+      interaction = { kind: "idle" };
+      if (elements.canvas.hasPointerCapture(event.pointerId)) {
+        elements.canvas.releasePointerCapture(event.pointerId);
+      }
+      render();
+      return;
+    }
+
     if (draftSelection && selectionHasArea(draftSelection)) {
       selections = [...selections, draftSelection];
     }
 
     dragStart = null;
     draftSelection = null;
+    interaction = { kind: "idle" };
     if (elements.canvas.hasPointerCapture(event.pointerId)) {
       elements.canvas.releasePointerCapture(event.pointerId);
     }
@@ -1022,6 +1129,7 @@ export function createEditorController(elements: EditorElements): void {
   elements.canvas.addEventListener("pointercancel", () => {
     dragStart = null;
     draftSelection = null;
+    interaction = { kind: "idle" };
     render();
   });
 
@@ -1123,7 +1231,8 @@ export function createEditorController(elements: EditorElements): void {
       return;
     }
 
-    await transformCurrentImage((bitmap) => cropBitmap(bitmap, lastSelection), {
+    const cropRect = getSelectionBounds(lastSelection);
+    await transformCurrentImage((bitmap) => cropBitmap(bitmap, cropRect), {
       message: "裁切圖片中..."
     });
   });
@@ -1307,39 +1416,6 @@ function toImagePoint(event: PointerEvent, canvas: HTMLCanvasElement, viewport: 
   const y = (event.clientY - bounds.top - viewport.offsetY) / viewport.scale;
 
   return { x, y };
-}
-
-function drawSelection(
-  context: CanvasRenderingContext2D,
-  selection: Rect,
-  viewport: Viewport,
-  label?: string
-): void {
-  const x = selection.x * viewport.scale + viewport.offsetX;
-  const y = selection.y * viewport.scale + viewport.offsetY;
-  const width = selection.width * viewport.scale;
-  const height = selection.height * viewport.scale;
-
-  context.save();
-  context.fillStyle = "rgba(56, 189, 248, 0.18)";
-  context.strokeStyle = "#0ea5e9";
-  context.lineWidth = 2;
-  context.setLineDash([8, 6]);
-  context.fillRect(x, y, width, height);
-  context.strokeRect(x, y, width, height);
-
-  if (label) {
-    context.setLineDash([]);
-    context.fillStyle = "#0ea5e9";
-    context.fillRect(x, y, 26, 22);
-    context.fillStyle = "#ffffff";
-    context.font = "700 13px system-ui, sans-serif";
-    context.textAlign = "center";
-    context.textBaseline = "middle";
-    context.fillText(label, x + 13, y + 11);
-  }
-
-  context.restore();
 }
 
 function drawSliceGrid(
@@ -1763,6 +1839,186 @@ function getBaseName(fileName: string): string {
 
 function sanitizeFileName(value: string): string {
   return value.trim().replace(/[<>:"/\\|?*\u0000-\u001f]+/g, "-").replace(/\s+/g, "-") || "image";
+}
+
+function getHandleImagePosition(rect: Rect, handle: ResizeHandle): Point {
+  const cx = rect.x + rect.width / 2;
+  const cy = rect.y + rect.height / 2;
+  const left = rect.x;
+  const right = rect.x + rect.width;
+  const top = rect.y;
+  const bottom = rect.y + rect.height;
+
+  switch (handle) {
+    case "nw":
+      return { x: left, y: top };
+    case "n":
+      return { x: cx, y: top };
+    case "ne":
+      return { x: right, y: top };
+    case "e":
+      return { x: right, y: cy };
+    case "se":
+      return { x: right, y: bottom };
+    case "s":
+      return { x: cx, y: bottom };
+    case "sw":
+      return { x: left, y: bottom };
+    case "w":
+      return { x: left, y: cy };
+  }
+}
+
+const RESIZE_HANDLES: ResizeHandle[] = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
+
+function findHandleAt(
+  point: Point,
+  selections: SelectionShape[],
+  viewport: Viewport
+): { selectionId: string; handle: ResizeHandle; rect: Rect } | null {
+  const toleranceImage = HANDLE_HIT_RADIUS_PX / viewport.scale;
+  for (let index = selections.length - 1; index >= 0; index -= 1) {
+    const selection = selections[index];
+    if (selection.kind !== "rect") {
+      continue;
+    }
+    for (const handle of RESIZE_HANDLES) {
+      const handlePoint = getHandleImagePosition(selection.rect, handle);
+      const dx = point.x - handlePoint.x;
+      const dy = point.y - handlePoint.y;
+      if (Math.hypot(dx, dy) <= toleranceImage) {
+        return { selectionId: selection.id, handle, rect: selection.rect };
+      }
+    }
+  }
+  return null;
+}
+
+function findSelectionAt(point: Point, selections: SelectionShape[]): SelectionShape | null {
+  for (let index = selections.length - 1; index >= 0; index -= 1) {
+    const selection = selections[index];
+    if (pointInSelectionBody(selection, point)) {
+      return selection;
+    }
+  }
+  return null;
+}
+
+function pointInSelectionBody(selection: SelectionShape, point: Point): boolean {
+  if (selection.kind === "rect") {
+    const { x, y, width, height } = selection.rect;
+    return point.x >= x && point.x <= x + width && point.y >= y && point.y <= y + height;
+  }
+  const bounds = getSelectionBounds(selection);
+  return (
+    point.x >= bounds.x &&
+    point.x <= bounds.x + bounds.width &&
+    point.y >= bounds.y &&
+    point.y <= bounds.y + bounds.height
+  );
+}
+
+function translateSelection(
+  selection: SelectionShape,
+  dx: number,
+  dy: number,
+  maxWidth: number,
+  maxHeight: number
+): SelectionShape {
+  if (selection.kind === "rect") {
+    const clampedDx = Math.max(-selection.rect.x, Math.min(maxWidth - selection.rect.x - selection.rect.width, dx));
+    const clampedDy = Math.max(-selection.rect.y, Math.min(maxHeight - selection.rect.y - selection.rect.height, dy));
+    return {
+      ...selection,
+      rect: {
+        ...selection.rect,
+        x: selection.rect.x + clampedDx,
+        y: selection.rect.y + clampedDy
+      }
+    };
+  }
+
+  const bounds = getSelectionBounds(selection);
+  const clampedDx = Math.max(-bounds.x, Math.min(maxWidth - bounds.x - bounds.width, dx));
+  const clampedDy = Math.max(-bounds.y, Math.min(maxHeight - bounds.y - bounds.height, dy));
+
+  if (selection.kind === "brush") {
+    return {
+      ...selection,
+      points: selection.points.map((point) => ({ x: point.x + clampedDx, y: point.y + clampedDy }))
+    };
+  }
+  return {
+    ...selection,
+    points: selection.points.map((point) => ({ x: point.x + clampedDx, y: point.y + clampedDy }))
+  };
+}
+
+function applyRectResize(
+  originalRect: Rect,
+  handle: ResizeHandle,
+  dx: number,
+  dy: number,
+  maxWidth: number,
+  maxHeight: number
+): Rect {
+  let left = originalRect.x;
+  let top = originalRect.y;
+  let right = originalRect.x + originalRect.width;
+  let bottom = originalRect.y + originalRect.height;
+
+  if (handle === "nw" || handle === "w" || handle === "sw") {
+    left = originalRect.x + dx;
+  }
+  if (handle === "ne" || handle === "e" || handle === "se") {
+    right = originalRect.x + originalRect.width + dx;
+  }
+  if (handle === "nw" || handle === "n" || handle === "ne") {
+    top = originalRect.y + dy;
+  }
+  if (handle === "sw" || handle === "s" || handle === "se") {
+    bottom = originalRect.y + originalRect.height + dy;
+  }
+
+  const x = Math.min(left, right);
+  const y = Math.min(top, bottom);
+  const width = Math.abs(right - left);
+  const height = Math.abs(bottom - top);
+  return clampRect({ x, y, width, height }, maxWidth, maxHeight);
+}
+
+function drawResizeHandles(context: CanvasRenderingContext2D, rect: Rect, viewport: Viewport): void {
+  const half = HANDLE_DRAW_SIZE_PX / 2;
+  context.save();
+  context.fillStyle = "#ffffff";
+  context.strokeStyle = "#0ea5e9";
+  context.lineWidth = 1.5;
+  context.setLineDash([]);
+  for (const handle of RESIZE_HANDLES) {
+    const point = getHandleImagePosition(rect, handle);
+    const screenX = point.x * viewport.scale + viewport.offsetX;
+    const screenY = point.y * viewport.scale + viewport.offsetY;
+    context.fillRect(screenX - half, screenY - half, HANDLE_DRAW_SIZE_PX, HANDLE_DRAW_SIZE_PX);
+    context.strokeRect(screenX - half, screenY - half, HANDLE_DRAW_SIZE_PX, HANDLE_DRAW_SIZE_PX);
+  }
+  context.restore();
+}
+
+function cursorForHandle(handle: ResizeHandle): string {
+  switch (handle) {
+    case "nw":
+    case "se":
+      return "nwse-resize";
+    case "ne":
+    case "sw":
+      return "nesw-resize";
+    case "n":
+    case "s":
+      return "ns-resize";
+    case "e":
+    case "w":
+      return "ew-resize";
+  }
 }
 
 function escapeHtml(value: string): string {
