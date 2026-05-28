@@ -144,6 +144,13 @@ type EditorElements = {
   applyLogoAllButton: HTMLButtonElement;
   applyScopeRow: HTMLElement;
   applyToAllImagesToggle: HTMLInputElement;
+  measureXButton: HTMLButtonElement;
+  measureXDialog: HTMLDialogElement;
+  measureXCloseButton: HTMLButtonElement;
+  measureCanvas: HTMLCanvasElement;
+  measureResult: HTMLElement;
+  measureResetButton: HTMLButtonElement;
+  measureApplyButton: HTMLButtonElement;
   exportName: HTMLInputElement;
   exportFormat: HTMLSelectElement;
   exportQuality: HTMLInputElement;
@@ -565,6 +572,7 @@ export function createEditorController(elements: EditorElements): void {
     elements.applyTemplateAllButton.disabled = images.length === 0 || isBusy;
     elements.applyLogoButton.disabled = !hasImage || !logoBitmap || isBusy;
     elements.applyLogoAllButton.disabled = images.length === 0 || !logoBitmap || isBusy;
+    elements.measureXButton.disabled = !logoBitmap || isBusy;
     updateLogoUi();
     elements.downloadButton.disabled = !hasImage || isBusy;
     elements.copyToClipboardButton.disabled = !hasImage || isBusy;
@@ -1404,6 +1412,151 @@ export function createEditorController(elements: EditorElements): void {
       message: "烙印 logo 到圖片中..."
     });
   });
+
+  let measureDragStart: number | null = null;
+  let measureRange: { y1: number; y2: number } | null = null;
+  let measureScale = 1;
+
+  const renderMeasureCanvas = () => {
+    if (!logoBitmap) {
+      return;
+    }
+    const canvas = elements.measureCanvas;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      return;
+    }
+    const maxWidth = 640;
+    const maxHeight = 360;
+    measureScale = Math.min(maxWidth / logoBitmap.width, maxHeight / logoBitmap.height, 1);
+    const dpr = window.devicePixelRatio || 1;
+    const displayW = logoBitmap.width * measureScale;
+    const displayH = logoBitmap.height * measureScale;
+    canvas.width = Math.round(displayW * dpr);
+    canvas.height = Math.round(displayH * dpr);
+    canvas.style.width = `${displayW}px`;
+    canvas.style.height = `${displayH}px`;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, displayW, displayH);
+    ctx.drawImage(logoBitmap, 0, 0, displayW, displayH);
+
+    if (measureRange) {
+      const top = Math.min(measureRange.y1, measureRange.y2);
+      const bottom = Math.max(measureRange.y1, measureRange.y2);
+      ctx.save();
+      ctx.fillStyle = "rgba(15, 118, 110, 0.18)";
+      ctx.fillRect(0, top, displayW, bottom - top);
+      ctx.strokeStyle = "#0f766e";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      ctx.moveTo(0, top);
+      ctx.lineTo(displayW, top);
+      ctx.moveTo(0, bottom);
+      ctx.lineTo(displayW, bottom);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+  };
+
+  const updateMeasureResult = () => {
+    if (!measureRange || !logoBitmap) {
+      elements.measureResult.textContent = "尚未測量";
+      elements.measureApplyButton.disabled = true;
+      return;
+    }
+    const pixelsOnDisplay = Math.abs(measureRange.y2 - measureRange.y1);
+    const pixelsOnLogo = pixelsOnDisplay / measureScale;
+    const percent = Math.round((pixelsOnLogo / logoBitmap.height) * 100);
+    elements.measureResult.textContent = `${Math.round(pixelsOnLogo)}px (= logo 高度的 ${percent}%)`;
+    elements.measureApplyButton.disabled = percent < 1;
+  };
+
+  const openMeasureDialog = () => {
+    if (!logoBitmap) {
+      return;
+    }
+    measureRange = null;
+    measureDragStart = null;
+    elements.measureXDialog.showModal();
+    requestAnimationFrame(() => {
+      renderMeasureCanvas();
+      updateMeasureResult();
+    });
+  };
+
+  const closeMeasureDialog = () => {
+    if (elements.measureXDialog.open) {
+      elements.measureXDialog.close();
+    }
+  };
+
+  elements.measureXButton.addEventListener("click", openMeasureDialog);
+  elements.measureXCloseButton.addEventListener("click", closeMeasureDialog);
+  elements.measureXDialog.addEventListener("click", (event) => {
+    if (event.target === elements.measureXDialog) {
+      closeMeasureDialog();
+    }
+  });
+
+  elements.measureResetButton.addEventListener("click", () => {
+    measureRange = null;
+    measureDragStart = null;
+    renderMeasureCanvas();
+    updateMeasureResult();
+  });
+
+  elements.measureApplyButton.addEventListener("click", () => {
+    if (!measureRange || !logoBitmap) {
+      return;
+    }
+    const pixelsOnDisplay = Math.abs(measureRange.y2 - measureRange.y1);
+    const pixelsOnLogo = pixelsOnDisplay / measureScale;
+    const percent = Math.max(5, Math.min(100, Math.round((pixelsOnLogo / logoBitmap.height) * 100)));
+    const stepped = Math.round(percent / 5) * 5;
+    elements.logoSafeAreaUnit.value = String(stepped);
+    closeMeasureDialog();
+    render();
+  });
+
+  const toMeasureY = (event: PointerEvent): number => {
+    const rect = elements.measureCanvas.getBoundingClientRect();
+    return Math.max(0, Math.min(rect.height, event.clientY - rect.top));
+  };
+
+  elements.measureCanvas.addEventListener("pointerdown", (event) => {
+    measureDragStart = toMeasureY(event);
+    measureRange = { y1: measureDragStart, y2: measureDragStart };
+    elements.measureCanvas.setPointerCapture(event.pointerId);
+    renderMeasureCanvas();
+    updateMeasureResult();
+  });
+
+  elements.measureCanvas.addEventListener("pointermove", (event) => {
+    if (measureDragStart === null) {
+      return;
+    }
+    measureRange = { y1: measureDragStart, y2: toMeasureY(event) };
+    renderMeasureCanvas();
+    updateMeasureResult();
+  });
+
+  const finishMeasureDrag = (event: PointerEvent) => {
+    if (measureDragStart === null) {
+      return;
+    }
+    measureRange = { y1: measureDragStart, y2: toMeasureY(event) };
+    measureDragStart = null;
+    if (elements.measureCanvas.hasPointerCapture(event.pointerId)) {
+      elements.measureCanvas.releasePointerCapture(event.pointerId);
+    }
+    renderMeasureCanvas();
+    updateMeasureResult();
+  };
+
+  elements.measureCanvas.addEventListener("pointerup", finishMeasureDrag);
+  elements.measureCanvas.addEventListener("pointercancel", finishMeasureDrag);
 
   elements.applyLogoAllButton.addEventListener("click", async () => {
     if (!logoBitmap || images.length === 0 || isBusy) {

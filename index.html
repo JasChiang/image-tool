@@ -212,7 +212,11 @@
                   <input id="logoSafeArea" type="range" min="0" max="400" step="10" value="100" />
                   <output id="logoSafeAreaValue" for="logoSafeArea">1× X</output>
                 </div>
-                <p class="helper-text logo-safe-hint">先估算 X 占 logo 高度多少（Senao 那種是 ~20%、大多 wordmark 是 25-50%、icon-only logo 則 ~100%），再設定要幾倍 X 當作淨空。</p>
+                <p class="helper-text logo-safe-hint">CI 規範裡的「X」通常是 logo 內某個字母（例如小寫 l、s 或 x）的高度。可以用下方「在 logo 上量 X」按鈕直接在預覽圖點兩下框出那個字母，或自己估算占 logo 高度多少 %。</p>
+                <button id="measureXButton" type="button" class="icon-button measure-x-button" disabled>
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7v10M22 7v10M4 12h16"/><path d="M6 9v6M10 9v6M14 9v6M18 9v6"/></svg>
+                  在 logo 上量 X
+                </button>
                 <label class="checkbox-row">
                   <input id="logoSafeAreaShow" type="checkbox" checked />
                   顯示安全區域虛線框
@@ -363,6 +367,31 @@
         </section>
       </section>
     </main>
+
+    <dialog id="measureXDialog" class="measure-dialog" aria-labelledby="measureXTitle">
+      <div class="measure-dialog-body">
+        <header class="measure-dialog-header">
+          <div>
+            <h2 id="measureXTitle">在 logo 上量 X</h2>
+            <p class="measure-instructions">在 logo 上按住滑鼠垂直拖曳，框出你 CI 規範裡的「X 字母」（例如 s / l / x 的高度）。</p>
+          </div>
+          <button id="measureXCloseButton" type="button" class="ghost-button" aria-label="關閉">關閉</button>
+        </header>
+        <div class="measure-canvas-wrap">
+          <canvas id="measureCanvas"></canvas>
+        </div>
+        <footer class="measure-dialog-footer">
+          <div class="measure-result">
+            <span>目前測量：</span>
+            <strong id="measureResult">尚未測量</strong>
+          </div>
+          <div class="measure-actions">
+            <button id="measureResetButton" type="button" class="ghost-button">重新測量</button>
+            <button id="measureApplyButton" type="button" class="primary-action" disabled>套用</button>
+          </div>
+        </footer>
+      </div>
+    </dialog>
 
     <dialog id="helpDialog" class="help-dialog" aria-labelledby="helpDialogTitle">
       <div class="help-dialog-body">

@@ -62,6 +62,13 @@ const applyLogoButton = document.querySelector<HTMLButtonElement>("#applyLogoBut
 const applyLogoAllButton = document.querySelector<HTMLButtonElement>("#applyLogoAllButton");
 const applyScopeRow = document.querySelector<HTMLElement>("#applyScopeRow");
 const applyToAllImagesToggle = document.querySelector<HTMLInputElement>("#applyToAllImagesToggle");
+const measureXButton = document.querySelector<HTMLButtonElement>("#measureXButton");
+const measureXDialog = document.querySelector<HTMLDialogElement>("#measureXDialog");
+const measureXCloseButton = document.querySelector<HTMLButtonElement>("#measureXCloseButton");
+const measureCanvas = document.querySelector<HTMLCanvasElement>("#measureCanvas");
+const measureResult = document.querySelector<HTMLElement>("#measureResult");
+const measureResetButton = document.querySelector<HTMLButtonElement>("#measureResetButton");
+const measureApplyButton = document.querySelector<HTMLButtonElement>("#measureApplyButton");
 const exportName = document.querySelector<HTMLInputElement>("#exportName");
 const exportFormat = document.querySelector<HTMLSelectElement>("#exportFormat");
 const exportQuality = document.querySelector<HTMLInputElement>("#exportQuality");
@@ -160,6 +167,13 @@ if (
   !applyLogoAllButton ||
   !applyScopeRow ||
   !applyToAllImagesToggle ||
+  !measureXButton ||
+  !measureXDialog ||
+  !measureXCloseButton ||
+  !measureCanvas ||
+  !measureResult ||
+  !measureResetButton ||
+  !measureApplyButton ||
   !cellSize ||
   !cellSizeValue ||
   !effectHint ||
@@ -266,6 +280,13 @@ createEditorController({
   applyLogoAllButton,
   applyScopeRow,
   applyToAllImagesToggle,
+  measureXButton,
+  measureXDialog,
+  measureXCloseButton,
+  measureCanvas,
+  measureResult,
+  measureResetButton,
+  measureApplyButton,
   cellSize,
   cellSizeValue,
   effectHint,

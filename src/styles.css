@@ -465,6 +465,103 @@ output {
   line-height: 1.45;
 }
 
+.measure-x-button {
+  width: 100%;
+  justify-content: center;
+}
+
+.measure-dialog {
+  border: none;
+  padding: 0;
+  border-radius: 14px;
+  width: min(720px, calc(100% - 32px));
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.32);
+}
+
+.measure-dialog::backdrop {
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(2px);
+}
+
+.measure-dialog-body {
+  padding: 22px 26px 24px;
+  display: grid;
+  gap: 16px;
+}
+
+.measure-dialog-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.measure-dialog-header h2 {
+  margin: 0 0 4px;
+  font-size: 1.2rem;
+}
+
+.measure-instructions {
+  margin: 0;
+  color: #475569;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.measure-canvas-wrap {
+  background:
+    linear-gradient(45deg, #e2e8f0 25%, transparent 25%),
+    linear-gradient(-45deg, #e2e8f0 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #e2e8f0 75%),
+    linear-gradient(-45deg, transparent 75%, #e2e8f0 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+  background-color: #f8fafc;
+  border: 1px solid #d6e1ea;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 220px;
+}
+
+#measureCanvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.measure-dialog-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.measure-result {
+  color: #475569;
+  font-size: 0.92rem;
+}
+
+.measure-result strong {
+  color: #0f766e;
+  margin-left: 8px;
+}
+
+.measure-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.measure-actions .primary-action {
+  width: auto;
+  min-width: 120px;
+}
+
 .selection-item:hover {
   border-color: #f59e0b;
   background: #fffbeb;
