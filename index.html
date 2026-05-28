@@ -249,6 +249,19 @@
                 <output id="exportQualityValue" for="exportQuality">92%</output>
               </div>
 
+              <div class="inline-control">
+                <label for="watermarkText">浮水印</label>
+                <input id="watermarkText" type="text" placeholder="（無，留空不加）" maxlength="60" />
+                <select id="watermarkPosition" title="浮水印位置" aria-label="浮水印位置">
+                  <option value="br">右下</option>
+                  <option value="bl">左下</option>
+                  <option value="tr">右上</option>
+                  <option value="tl">左上</option>
+                  <option value="center">置中</option>
+                  <option value="tile">對角平鋪</option>
+                </select>
+              </div>
+
               <div class="action-grid">
                 <button id="downloadButton" class="primary-action" type="button" disabled title="下載目前正在編輯的這張圖片 (Cmd/Ctrl+S)">下載目前圖片</button>
                 <button id="copyToClipboardButton" type="button" disabled title="複製到剪貼簿，直接 Cmd/Ctrl+V 貼到任何地方">複製到剪貼簿</button>
@@ -352,6 +365,10 @@
         <section class="help-section">
           <h3>關於隱私</h3>
           <p>所有圖片處理（讀取、編輯、輸出）都在你的瀏覽器內完成，沒有任何資料傳到伺服器。即使網路斷線，這個工具大部分功能仍能運作。關掉瀏覽器分頁後，所有圖片與選區都會消失，不會留下任何痕跡。</p>
+          <p class="help-danger-row">
+            想立刻清掉所有載入的圖片與設定？
+            <button id="leaveNoTraceButton" type="button" class="danger-button">🚪 離開不留痕</button>
+          </p>
         </section>
       </div>
     </dialog>

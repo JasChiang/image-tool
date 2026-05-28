@@ -200,9 +200,13 @@ button:disabled {
 
 .inline-control input[type="text"],
 .inline-control select {
-  grid-column: 2 / span 2;
   padding: 8px 10px;
   font-size: 0.92rem;
+}
+
+.inline-control input[type="text"],
+.inline-control select {
+  min-width: 0;
 }
 
 .inline-control output {
@@ -356,15 +360,58 @@ output {
 
 .selection-item {
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 10px;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
   align-items: center;
   border: 1px solid #d6e1ea;
   border-radius: 8px;
-  padding: 12px;
+  padding: 10px;
   background: #ffffff;
   transition: border-color 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
   cursor: default;
+}
+
+.selection-effect-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 56px;
+  min-height: 28px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+}
+
+.selection-effect-chip.effect-mosaic {
+  background: #e0e7ff;
+  color: #3730a3;
+  border-color: #c7d2fe;
+}
+
+.selection-effect-chip.effect-blur {
+  background: #f3e8ff;
+  color: #6b21a8;
+  border-color: #e9d5ff;
+}
+
+.selection-effect-chip.effect-blackout {
+  background: #1f2937;
+  color: #ffffff;
+  border-color: #111827;
+}
+
+.selection-effect-chip.effect-cover {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fde68a;
+}
+
+.selection-effect-chip:hover {
+  transform: scale(1.05);
 }
 
 .selection-item:hover {
@@ -1009,6 +1056,33 @@ canvas {
 .help-shortcuts td:first-child {
   white-space: nowrap;
   width: 1%;
+}
+
+.help-danger-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  padding-top: 12px;
+  border-top: 1px dashed #fecaca;
+  color: #475569;
+  font-size: 0.92rem;
+}
+
+.danger-button {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fca5a5;
+  font-weight: 600;
+  font-size: 0.88rem;
+  padding: 8px 14px;
+  border-radius: 8px;
+}
+
+.danger-button:hover {
+  background: #fee2e2;
+  border-color: #ef4444;
 }
 
 .help-section kbd,

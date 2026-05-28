@@ -58,6 +58,8 @@ type Viewport = {
   offsetY: number;
 };
 
+type WatermarkPosition = "br" | "bl" | "tr" | "tl" | "center" | "tile";
+
 type UiSettings = {
   activeToolId: ToolId;
   selectionMode: SelectionMode;
@@ -69,6 +71,8 @@ type UiSettings = {
   workspaceSize: number;
   gridSize: number;
   showGrid: boolean;
+  watermarkText: string;
+  watermarkPosition: WatermarkPosition;
 };
 
 type ImageEntry = {
@@ -119,6 +123,9 @@ type EditorElements = {
   cropRatio: HTMLSelectElement;
   copyToClipboardButton: HTMLButtonElement;
   applyButtonLabel: HTMLElement;
+  watermarkText: HTMLInputElement;
+  watermarkPosition: HTMLSelectElement;
+  leaveNoTraceButton: HTMLButtonElement;
   exportName: HTMLInputElement;
   exportFormat: HTMLSelectElement;
   exportQuality: HTMLInputElement;
@@ -176,7 +183,9 @@ const DEFAULT_SETTINGS: UiSettings = {
   exportQuality: 92,
   workspaceSize: 100,
   gridSize: 100,
-  showGrid: true
+  showGrid: true,
+  watermarkText: "",
+  watermarkPosition: "br"
 };
 
 const TEMPLATE_PRESETS: Record<string, { label: string; width: number; height: number }> = {
@@ -269,6 +278,15 @@ export function createEditorController(elements: EditorElements): void {
   let activeToolId: ToolId = settings.activeToolId;
   let activePolygonPoints: Point[] = [];
   let highlightedSelectionIndex: number | null = null;
+  const selectionEffects = new Map<string, ToolId>();
+
+  const TOOL_ORDER: ToolId[] = ["mosaic", "blur", "blackout", "cover"];
+  const nextToolId = (current: ToolId): ToolId => {
+    const idx = TOOL_ORDER.indexOf(current);
+    return TOOL_ORDER[(idx + 1) % TOOL_ORDER.length];
+  };
+  const getSelectionEffect = (selection: SelectionShape) =>
+    selectionEffects.get(selection.id) ?? activeToolId;
 
   hydrateUiFromSettings();
 
@@ -300,6 +318,14 @@ export function createEditorController(elements: EditorElements): void {
 
   const getActiveToolConfig = () => TOOL_CONFIG[activeToolId];
 
+  const getWatermarkConfig = () => {
+    const text = elements.watermarkText.value.trim();
+    if (!text) {
+      return undefined;
+    }
+    return { text, position: elements.watermarkPosition.value as WatermarkPosition };
+  };
+
   const saveSettings = () => {
     const next: UiSettings = {
       activeToolId,
@@ -314,7 +340,9 @@ export function createEditorController(elements: EditorElements): void {
       exportQuality: Number(elements.exportQuality.value),
       workspaceSize: Number(elements.workspaceSize.value),
       gridSize: Number(elements.gridSize.value),
-      showGrid: elements.showGrid.checked
+      showGrid: elements.showGrid.checked,
+      watermarkText: elements.watermarkText.value,
+      watermarkPosition: elements.watermarkPosition.value as WatermarkPosition
     };
 
     Object.assign(settings, next);
@@ -326,6 +354,11 @@ export function createEditorController(elements: EditorElements): void {
     draftSelection = null;
     dragStart = null;
     activePolygonPoints = [];
+    selectionEffects.clear();
+  };
+
+  const tagNewSelection = (selection: SelectionShape) => {
+    selectionEffects.set(selection.id, activeToolId);
   };
 
   const clearCutLines = () => {
@@ -415,12 +448,15 @@ export function createEditorController(elements: EditorElements): void {
         const y = Math.round(bounds.y);
         const label = getSelectionDisplayLabel(selection);
 
+        const effectId = getSelectionEffect(selection);
+        const effectLabel = TOOL_CONFIG[effectId].label.replace(/格子|半徑|模式|遮蓋/g, "").trim() || effectId;
         return `
           <div class="selection-item" data-highlight-index="${index}">
             <div>
               <strong>區域 ${index + 1} · ${label}</strong>
               <p>${x}, ${y} / ${width} × ${height}</p>
             </div>
+            <button type="button" class="selection-effect-chip effect-${effectId}" data-cycle-effect="${index}" title="點擊切換這個選區的效果">${effectLabel}</button>
             <button type="button" class="selection-remove-button" data-selection-index="${index}" aria-label="刪除區域 ${index + 1}" title="刪除這個選區">✕</button>
           </div>
         `;
@@ -482,6 +518,17 @@ export function createEditorController(elements: EditorElements): void {
     elements.editPanel.hidden = mode !== "edit";
     elements.slicePanel.hidden = mode !== "slice";
     elements.applyButton.disabled = !hasImage || !hasSelection || isBusy;
+    if (hasSelection) {
+      const effects = new Set(selections.map((s) => getSelectionEffect(s)));
+      if (effects.size > 1) {
+        elements.applyButtonLabel.textContent = `套用 ${effects.size} 種效果`;
+      } else {
+        const onlyEffect = effects.values().next().value as ToolId;
+        elements.applyButtonLabel.textContent = TOOL_CONFIG[onlyEffect].buttonLabel;
+      }
+    } else {
+      elements.applyButtonLabel.textContent = getActiveToolConfig().buttonLabel;
+    }
     elements.removeLastSelectionButton.disabled = !hasSelection || isBusy;
     elements.clearSelectionButton.disabled = !hasSelection || isBusy;
     elements.undoButton.disabled =
@@ -762,30 +809,55 @@ export function createEditorController(elements: EditorElements): void {
     if (index < 0 || index >= selections.length || isBusy) {
       return;
     }
+    const removed = selections[index];
+    if (removed) {
+      selectionEffects.delete(removed.id);
+    }
     selections = selections.filter((_, currentIndex) => currentIndex !== index);
     render();
   };
 
   const applyCurrentTool = async () => {
     const activeEntry = getActiveEntry();
-    const bitmap = activeEntry?.document.bitmap;
+    const startBitmap = activeEntry?.document.bitmap;
 
-    if (!activeEntry || !bitmap || selections.length === 0 || isBusy) {
+    if (!activeEntry || !startBitmap || selections.length === 0 || isBusy) {
       return;
     }
 
-    try {
-      setBusy(true, `${getActiveToolConfig().buttonLabel}處理中...`);
-      const tool = getActiveToolConfig().tool;
-      const regions = selections.flatMap((selection) =>
-        selectionToRects(selection, bitmap.width, bitmap.height)
-      );
-      const result = await applyToolToRegions(tool, bitmap, selections, {
-        cellSize: Number(elements.cellSize.value),
-        coverColor: elements.coverColor.value
-      }, regions);
+    const groups = new Map<ToolId, SelectionShape[]>();
+    for (const selection of selections) {
+      const effect = getSelectionEffect(selection);
+      const list = groups.get(effect) ?? [];
+      list.push(selection);
+      groups.set(effect, list);
+    }
 
-      await activeEntry.document.replaceWith(result);
+    try {
+      setBusy(true, groups.size > 1 ? `套用 ${groups.size} 種效果中...` : `${getActiveToolConfig().buttonLabel}處理中...`);
+      let workingSource: ImageBitmap = startBitmap;
+      let lastResult: HTMLCanvasElement | null = null;
+      let intermediate: ImageBitmap | null = null;
+      for (const [effectId, effectSelections] of groups) {
+        const tool = TOOL_CONFIG[effectId].tool;
+        const regions = effectSelections.flatMap((selection) =>
+          selectionToRects(selection, workingSource.width, workingSource.height)
+        );
+        const canvas = await applyToolToRegions(tool, workingSource, effectSelections, {
+          cellSize: Number(elements.cellSize.value),
+          coverColor: elements.coverColor.value
+        }, regions);
+        lastResult = canvas;
+        if (intermediate) {
+          intermediate.close();
+        }
+        intermediate = await createImageBitmap(canvas);
+        workingSource = intermediate;
+      }
+      if (lastResult) {
+        await activeEntry.document.replaceWith(lastResult);
+      }
+      intermediate?.close();
       await updateThumbnail(activeEntry);
       clearSelections();
     } catch (error) {
@@ -805,7 +877,7 @@ export function createEditorController(elements: EditorElements): void {
 
     try {
       setBusy(true, "圖片匯出中...");
-      const blob = await exportBitmap(bitmap, elements.exportFormat.value as ExportFormat, Number(elements.exportQuality.value));
+      const blob = await exportBitmap(bitmap, elements.exportFormat.value as ExportFormat, Number(elements.exportQuality.value), getWatermarkConfig());
       downloadBlob(blob, `${sanitizeFileName(elements.exportName.value || getBaseName(activeEntry.name))}.${getFileExtension(elements.exportFormat.value as ExportFormat)}`);
     } catch (error) {
       reportError(error, "下載圖片失敗，請稍後再試。");
@@ -834,7 +906,7 @@ export function createEditorController(elements: EditorElements): void {
         processed += 1;
         setBusy(true, `批次 ZIP 產生中 (${processed}/${images.length})...`);
         const format = elements.exportFormat.value as ExportFormat;
-        const blob = await exportBitmap(bitmap, format, Number(elements.exportQuality.value));
+        const blob = await exportBitmap(bitmap, format, Number(elements.exportQuality.value), getWatermarkConfig());
         files.push({
           name: `${sanitizeFileName(getBaseName(entry.name))}.${getFileExtension(format)}`,
           data: new Uint8Array(await blob.arrayBuffer())
@@ -1089,6 +1161,27 @@ export function createEditorController(elements: EditorElements): void {
     render();
   });
 
+  elements.watermarkText.addEventListener("input", saveSettings);
+  elements.watermarkPosition.addEventListener("change", saveSettings);
+
+  elements.leaveNoTraceButton.addEventListener("click", () => {
+    const confirmed = window.confirm(
+      "確定要清除這個分頁的所有圖片、選區與設定，然後重新整理？\n（操作完成前所有資料只存在你的瀏覽器內，重新整理後不會留下任何痕跡。）"
+    );
+    if (!confirmed) {
+      return;
+    }
+    images.forEach((entry) => entry.document.dispose());
+    images.length = 0;
+    selections = [];
+    try {
+      localStorage.removeItem(SETTINGS_KEY);
+    } catch {
+      // ignore
+    }
+    window.location.reload();
+  });
+
   elements.exportQuality.addEventListener("input", () => {
     saveSettings();
     render();
@@ -1114,6 +1207,18 @@ export function createEditorController(elements: EditorElements): void {
   elements.selectionList.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    const cycleButton = target.closest<HTMLElement>("[data-cycle-effect]");
+    if (cycleButton) {
+      event.preventDefault();
+      const idx = Number(cycleButton.dataset.cycleEffect);
+      const selection = selections[idx];
+      if (selection) {
+        const current = getSelectionEffect(selection);
+        selectionEffects.set(selection.id, nextToolId(current));
+        render();
+      }
       return;
     }
     const button = target.closest<HTMLButtonElement>("[data-selection-index]");
@@ -1286,6 +1391,7 @@ export function createEditorController(elements: EditorElements): void {
     }
 
     if (draftSelection && selectionHasArea(draftSelection)) {
+      tagNewSelection(draftSelection);
       selections = [...selections, draftSelection];
     }
 
@@ -1310,13 +1416,15 @@ export function createEditorController(elements: EditorElements): void {
       return;
     }
 
+    const polygonSel: SelectionShape = {
+      id: crypto.randomUUID(),
+      kind: "polygon",
+      points: [...activePolygonPoints]
+    };
+    tagNewSelection(polygonSel);
     selections = [
       ...selections,
-      {
-        id: crypto.randomUUID(),
-        kind: "polygon",
-        points: [...activePolygonPoints]
-      }
+      polygonSel
     ];
     activePolygonPoints = [];
     render();
@@ -1332,6 +1440,8 @@ export function createEditorController(elements: EditorElements): void {
     if (selections.length === 0 || isBusy) {
       return;
     }
+    const last = selections[selections.length - 1];
+    if (last) selectionEffects.delete(last.id);
     selections = selections.slice(0, -1);
     render();
   });
@@ -1357,6 +1467,8 @@ export function createEditorController(elements: EditorElements): void {
     }
 
     if (selections.length > 0) {
+      const last = selections[selections.length - 1];
+      if (last) selectionEffects.delete(last.id);
       selections = selections.slice(0, -1);
       render();
       return;
@@ -1663,6 +1775,8 @@ export function createEditorController(elements: EditorElements): void {
     elements.gridSizeValue.value = `${settings.gridSize} px`;
     elements.showGrid.checked = settings.showGrid;
     elements.coverColor.value = settings.coverColor;
+    elements.watermarkText.value = settings.watermarkText;
+    elements.watermarkPosition.value = settings.watermarkPosition;
   }
 
   function updateWorkspaceFrame(bitmap: ImageBitmap | null): void {
@@ -1996,7 +2110,12 @@ function flipBitmap(bitmap: ImageBitmap, axis: "horizontal" | "vertical"): HTMLC
   return canvas;
 }
 
-async function exportBitmap(bitmap: ImageBitmap, format: ExportFormat, quality: number): Promise<Blob> {
+async function exportBitmap(
+  bitmap: ImageBitmap,
+  format: ExportFormat,
+  quality: number,
+  watermark?: { text: string; position: WatermarkPosition }
+): Promise<Blob> {
   const canvas = document.createElement("canvas");
   canvas.width = bitmap.width;
   canvas.height = bitmap.height;
@@ -2006,10 +2125,78 @@ async function exportBitmap(bitmap: ImageBitmap, format: ExportFormat, quality: 
   }
 
   context.drawImage(bitmap, 0, 0);
+  if (watermark && watermark.text.trim()) {
+    drawWatermark(context, canvas.width, canvas.height, watermark.text.trim(), watermark.position);
+  }
   if (format === "pdf") {
     return canvasToPdfBlob(canvas, quality);
   }
   return canvasToBlob(canvas, format, quality);
+}
+
+function drawWatermark(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  text: string,
+  position: WatermarkPosition
+): void {
+  const baseSize = Math.max(14, Math.round(Math.min(width, height) * 0.022));
+  ctx.save();
+  ctx.font = `600 ${baseSize}px system-ui, sans-serif`;
+  ctx.fillStyle = "rgba(255, 255, 255, 0.92)";
+  ctx.strokeStyle = "rgba(15, 23, 42, 0.65)";
+  ctx.lineWidth = Math.max(2, baseSize / 9);
+  ctx.lineJoin = "round";
+  ctx.textBaseline = "alphabetic";
+
+  if (position === "tile") {
+    const metrics = ctx.measureText(text);
+    const stepX = metrics.width + baseSize * 4;
+    const stepY = baseSize * 5;
+    ctx.translate(width / 2, height / 2);
+    ctx.rotate((-25 * Math.PI) / 180);
+    ctx.translate(-width / 2, -height / 2);
+    ctx.globalAlpha = 0.5;
+    for (let y = -stepY; y < height + stepY; y += stepY) {
+      for (let x = -stepX; x < width + stepX; x += stepX) {
+        ctx.strokeText(text, x, y);
+        ctx.fillText(text, x, y);
+      }
+    }
+    ctx.restore();
+    return;
+  }
+
+  const padding = Math.max(16, baseSize);
+  const metrics = ctx.measureText(text);
+  let x = padding;
+  let y = padding + baseSize;
+  if (position === "br") {
+    ctx.textAlign = "right";
+    x = width - padding;
+    y = height - padding;
+  } else if (position === "bl") {
+    ctx.textAlign = "left";
+    x = padding;
+    y = height - padding;
+  } else if (position === "tr") {
+    ctx.textAlign = "right";
+    x = width - padding;
+    y = padding + baseSize;
+  } else if (position === "tl") {
+    ctx.textAlign = "left";
+    x = padding;
+    y = padding + baseSize;
+  } else if (position === "center") {
+    ctx.textAlign = "center";
+    x = width / 2;
+    y = height / 2;
+  }
+  ctx.strokeText(text, x, y);
+  ctx.fillText(text, x, y);
+  ctx.restore();
+  void metrics;
 }
 
 function canvasToPdfBlob(canvas: HTMLCanvasElement, quality: number): Blob {
@@ -2539,7 +2726,9 @@ function loadSettings(): UiSettings {
       exportQuality: parsed.exportQuality ?? DEFAULT_SETTINGS.exportQuality,
       workspaceSize: parsed.workspaceSize ?? DEFAULT_SETTINGS.workspaceSize,
       gridSize: parsed.gridSize ?? DEFAULT_SETTINGS.gridSize,
-      showGrid: parsed.showGrid ?? DEFAULT_SETTINGS.showGrid
+      showGrid: parsed.showGrid ?? DEFAULT_SETTINGS.showGrid,
+      watermarkText: parsed.watermarkText ?? DEFAULT_SETTINGS.watermarkText,
+      watermarkPosition: (parsed.watermarkPosition as WatermarkPosition) || DEFAULT_SETTINGS.watermarkPosition
     };
   } catch {
     return structuredClone(DEFAULT_SETTINGS);

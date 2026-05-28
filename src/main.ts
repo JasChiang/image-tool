@@ -41,6 +41,9 @@ const eyedropperButton = document.querySelector<HTMLButtonElement>("#eyedropperB
 const cropRatio = document.querySelector<HTMLSelectElement>("#cropRatio");
 const copyToClipboardButton = document.querySelector<HTMLButtonElement>("#copyToClipboardButton");
 const applyButtonLabel = document.querySelector<HTMLElement>("#applyButton .primary-action-label");
+const watermarkText = document.querySelector<HTMLInputElement>("#watermarkText");
+const watermarkPosition = document.querySelector<HTMLSelectElement>("#watermarkPosition");
+const leaveNoTraceButton = document.querySelector<HTMLButtonElement>("#leaveNoTraceButton");
 const exportName = document.querySelector<HTMLInputElement>("#exportName");
 const exportFormat = document.querySelector<HTMLSelectElement>("#exportFormat");
 const exportQuality = document.querySelector<HTMLInputElement>("#exportQuality");
@@ -118,6 +121,9 @@ if (
   !cropRatio ||
   !copyToClipboardButton ||
   !applyButtonLabel ||
+  !watermarkText ||
+  !watermarkPosition ||
+  !leaveNoTraceButton ||
   !cellSize ||
   !cellSizeValue ||
   !effectHint ||
@@ -203,6 +209,9 @@ createEditorController({
   cropRatio,
   copyToClipboardButton,
   applyButtonLabel,
+  watermarkText,
+  watermarkPosition,
+  leaveNoTraceButton,
   cellSize,
   cellSizeValue,
   effectHint,
