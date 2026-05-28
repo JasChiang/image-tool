@@ -120,6 +120,7 @@ type EditorElements = {
   flipHorizontalButton: HTMLButtonElement;
   flipVerticalButton: HTMLButtonElement;
   templatePreset: HTMLSelectElement;
+  templateFillMode: HTMLSelectElement;
   applyTemplateButton: HTMLButtonElement;
   applyTemplateAllButton: HTMLButtonElement;
   showGrid: HTMLInputElement;
@@ -624,7 +625,7 @@ export function createEditorController(elements: EditorElements): void {
     }
 
     const [entry] = images.splice(index, 1);
-    entry.document.reset().catch(() => undefined);
+    entry.document.dispose();
     if (activeImageId === id) {
       activeImageId = images[index]?.id ?? images[index - 1]?.id ?? images[0]?.id ?? null;
       resetEphemeralState();
@@ -1299,14 +1300,19 @@ export function createEditorController(elements: EditorElements): void {
   });
 
   const getSelectedTemplate = () => TEMPLATE_PRESETS[elements.templatePreset.value] ?? null;
+  const getSelectedFillMode = (): TemplateFillMode => {
+    const value = elements.templateFillMode.value;
+    return value === "white" || value === "black" ? value : "blur";
+  };
 
   elements.applyTemplateButton.addEventListener("click", async () => {
     const preset = getSelectedTemplate();
     if (!preset) {
       return;
     }
+    const fillMode = getSelectedFillMode();
     await transformCurrentImage(
-      (bitmap) => fitBitmapToSize(bitmap, preset.width, preset.height),
+      (bitmap) => fitBitmapToSize(bitmap, preset.width, preset.height, fillMode),
       { message: `套用「${preset.label}」中...` }
     );
   });
@@ -1316,7 +1322,16 @@ export function createEditorController(elements: EditorElements): void {
     if (!preset || images.length === 0 || isBusy) {
       return;
     }
+    if (
+      images.length > 1 &&
+      !window.confirm(
+        `將「${preset.label}」套用到 ${images.length} 張圖片？\n（每張圖片可個別復原，但無法一次還原全部）`
+      )
+    ) {
+      return;
+    }
 
+    const fillMode = getSelectedFillMode();
     try {
       let processed = 0;
       setBusy(true, `批次套用「${preset.label}」(0/${images.length})...`);
@@ -1327,7 +1342,7 @@ export function createEditorController(elements: EditorElements): void {
         }
         processed += 1;
         setBusy(true, `批次套用「${preset.label}」(${processed}/${images.length})...`);
-        const canvas = fitBitmapToSize(bitmap, preset.width, preset.height);
+        const canvas = fitBitmapToSize(bitmap, preset.width, preset.height, fillMode);
         await entry.document.replaceWith(canvas);
         await updateThumbnail(entry);
       }
@@ -1693,11 +1708,13 @@ function rotateBitmap(bitmap: ImageBitmap, degrees: 90 | -90): HTMLCanvasElement
   return canvas;
 }
 
+type TemplateFillMode = "blur" | "white" | "black";
+
 function fitBitmapToSize(
   bitmap: ImageBitmap,
   targetWidth: number,
   targetHeight: number,
-  background = "#ffffff"
+  fillMode: TemplateFillMode = "blur"
 ): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
   canvas.width = targetWidth;
@@ -1707,8 +1724,20 @@ function fitBitmapToSize(
     throw new Error("Canvas is not supported.");
   }
 
-  context.fillStyle = background;
-  context.fillRect(0, 0, targetWidth, targetHeight);
+  if (fillMode === "blur") {
+    const coverScale = Math.max(targetWidth / bitmap.width, targetHeight / bitmap.height);
+    const coverWidth = bitmap.width * coverScale;
+    const coverHeight = bitmap.height * coverScale;
+    const coverX = (targetWidth - coverWidth) / 2;
+    const coverY = (targetHeight - coverHeight) / 2;
+    context.save();
+    context.filter = "blur(28px) brightness(0.88)";
+    context.drawImage(bitmap, coverX, coverY, coverWidth, coverHeight);
+    context.restore();
+  } else {
+    context.fillStyle = fillMode === "black" ? "#000000" : "#ffffff";
+    context.fillRect(0, 0, targetWidth, targetHeight);
+  }
 
   const scale = Math.min(targetWidth / bitmap.width, targetHeight / bitmap.height);
   const drawWidth = bitmap.width * scale;

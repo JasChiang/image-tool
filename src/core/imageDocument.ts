@@ -96,6 +96,14 @@ export class ImageDocument {
     this.future = [];
   }
 
+  dispose(): void {
+    this.releaseAll();
+    this.original = null;
+    this.current = null;
+    this.history = [];
+    this.future = [];
+  }
+
   private releaseAll(): void {
     this.original?.close();
     this.current?.close();

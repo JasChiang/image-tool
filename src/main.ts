@@ -47,6 +47,7 @@ const rotateRightButton = document.querySelector<HTMLButtonElement>("#rotateRigh
 const flipHorizontalButton = document.querySelector<HTMLButtonElement>("#flipHorizontalButton");
 const flipVerticalButton = document.querySelector<HTMLButtonElement>("#flipVerticalButton");
 const templatePreset = document.querySelector<HTMLSelectElement>("#templatePreset");
+const templateFillMode = document.querySelector<HTMLSelectElement>("#templateFillMode");
 const applyTemplateButton = document.querySelector<HTMLButtonElement>("#applyTemplateButton");
 const applyTemplateAllButton = document.querySelector<HTMLButtonElement>("#applyTemplateAllButton");
 const showGrid = document.querySelector<HTMLInputElement>("#showGrid");
@@ -117,6 +118,7 @@ if (
   !flipHorizontalButton ||
   !flipVerticalButton ||
   !templatePreset ||
+  !templateFillMode ||
   !applyTemplateButton ||
   !applyTemplateAllButton ||
   !showGrid ||
@@ -190,6 +192,7 @@ createEditorController({
   flipHorizontalButton,
   flipVerticalButton,
   templatePreset,
+  templateFillMode,
   applyTemplateButton,
   applyTemplateAllButton,
   showGrid,
