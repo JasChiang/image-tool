@@ -3,6 +3,9 @@ import { createEditorController } from "./ui/editorController";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#imageCanvas");
 const fileInput = document.querySelector<HTMLInputElement>("#fileInput");
+const helpButton = document.querySelector<HTMLButtonElement>("#helpButton");
+const helpDialog = document.querySelector<HTMLDialogElement>("#helpDialog");
+const helpCloseButton = document.querySelector<HTMLButtonElement>("#helpCloseButton");
 const canvasPanel = document.querySelector<HTMLElement>("#canvasPanel");
 const dropZone = document.querySelector<HTMLElement>("#dropZone");
 const emptyState = document.querySelector<HTMLElement>("#emptyState");
@@ -74,6 +77,9 @@ const processingStatus = document.querySelector<HTMLElement>("#processingStatus"
 if (
   !canvas ||
   !fileInput ||
+  !helpButton ||
+  !helpDialog ||
+  !helpCloseButton ||
   !canvasPanel ||
   !dropZone ||
   !emptyState ||
@@ -148,6 +154,9 @@ if (
 createEditorController({
   canvas,
   fileInput,
+  helpButton,
+  helpDialog,
+  helpCloseButton,
   canvasPanel,
   dropZone,
   emptyState,

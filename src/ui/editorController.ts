@@ -76,6 +76,9 @@ type ImageEntry = {
 type EditorElements = {
   canvas: HTMLCanvasElement;
   fileInput: HTMLInputElement;
+  helpButton: HTMLButtonElement;
+  helpDialog: HTMLDialogElement;
+  helpCloseButton: HTMLButtonElement;
   canvasPanel: HTMLElement;
   dropZone: HTMLElement;
   emptyState: HTMLElement;
@@ -864,6 +867,54 @@ export function createEditorController(elements: EditorElements): void {
     render();
   });
 
+  const openHelp = () => {
+    if (typeof elements.helpDialog.showModal === "function" && !elements.helpDialog.open) {
+      elements.helpDialog.showModal();
+    }
+  };
+  const closeHelp = () => {
+    if (elements.helpDialog.open) {
+      elements.helpDialog.close();
+    }
+  };
+  elements.helpButton.addEventListener("click", openHelp);
+  elements.helpCloseButton.addEventListener("click", closeHelp);
+  elements.helpDialog.addEventListener("click", (event) => {
+    if (event.target === elements.helpDialog) {
+      closeHelp();
+    }
+  });
+
+  window.addEventListener("paste", async (event) => {
+    if (elements.helpDialog.open) {
+      return;
+    }
+    const target = event.target as HTMLElement | null;
+    if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+      return;
+    }
+    const items = event.clipboardData?.items;
+    if (!items) {
+      return;
+    }
+    const files: File[] = [];
+    for (const item of items) {
+      if (item.kind === "file") {
+        const file = item.getAsFile();
+        if (file && (file.type.startsWith("image/") || file.type === "application/pdf")) {
+          files.push(file);
+        }
+      }
+    }
+    if (files.length === 0) {
+      return;
+    }
+    event.preventDefault();
+    const dataTransfer = new DataTransfer();
+    files.forEach((file) => dataTransfer.items.add(file));
+    await addFiles(dataTransfer.files);
+  });
+
   elements.fileInput.addEventListener("change", async () => {
     await addFiles(elements.fileInput.files);
   });
@@ -1394,8 +1445,16 @@ export function createEditorController(elements: EditorElements): void {
     if (event.repeat) {
       return;
     }
+    if (event.key === "Escape" && elements.helpDialog.open) {
+      return;
+    }
     const target = event.target as HTMLElement | null;
     if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.isContentEditable)) {
+      return;
+    }
+    if (event.key === "?" && !elements.helpDialog.open) {
+      event.preventDefault();
+      openHelp();
       return;
     }
     if (isBusy) {

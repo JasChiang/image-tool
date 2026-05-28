@@ -56,6 +56,33 @@ h1 {
   margin-bottom: 6px;
   font-size: clamp(1.45rem, 3vw, 2.1rem);
   line-height: 1.1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.privacy-badge {
+  font-size: 0.72rem;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  cursor: help;
+  font-weight: 500;
+}
+
+.ghost-button {
+  background: transparent;
+  color: #1f2937;
+  border-color: #cbd5e1;
+}
+
+.ghost-button:hover:not(:disabled) {
+  background: #f1f5f9;
 }
 
 .toolbar-copy {
@@ -462,6 +489,58 @@ canvas {
   line-height: 1.6;
 }
 
+.empty-state kbd {
+  display: inline-block;
+  padding: 2px 6px;
+  margin: 0 2px;
+  border: 1px solid #cbd5e1;
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: #f8fafc;
+  font-family: ui-monospace, "SF Mono", Consolas, monospace;
+  font-size: 0.82em;
+  color: #1e293b;
+}
+
+.workflow-steps {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px 18px;
+  margin: 0 auto;
+  padding: 0;
+  list-style: none;
+  max-width: 560px;
+}
+
+.workflow-steps li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #475569;
+  font-size: 0.95rem;
+}
+
+.workflow-steps .step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #0f766e;
+  color: #ffffff;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.trust-line {
+  margin-top: 4px !important;
+  color: #047857 !important;
+  font-size: 0.86rem !important;
+  font-weight: 500;
+}
+
 .sample-image {
   width: min(72vw, 360px);
   height: 190px;
@@ -507,4 +586,103 @@ canvas {
   .controls {
     padding: 14px;
   }
+}
+
+.help-dialog {
+  border: none;
+  padding: 0;
+  border-radius: 12px;
+  max-width: 640px;
+  width: calc(100% - 32px);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
+}
+
+.help-dialog::backdrop {
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(2px);
+}
+
+.help-dialog-body {
+  padding: 24px 28px 28px;
+  max-height: min(80vh, 720px);
+  overflow-y: auto;
+}
+
+.help-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.help-dialog-header h2 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+.help-section {
+  margin-top: 22px;
+}
+
+.help-section h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  color: #0f766e;
+}
+
+.help-section p {
+  margin: 0;
+  color: #475569;
+  line-height: 1.6;
+}
+
+.help-flow,
+.help-list {
+  margin: 0;
+  padding-left: 22px;
+  color: #334155;
+  line-height: 1.65;
+}
+
+.help-flow li,
+.help-list li {
+  margin-bottom: 6px;
+}
+
+.help-flow strong,
+.help-list strong {
+  color: #0f172a;
+}
+
+.help-shortcuts {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.92rem;
+}
+
+.help-shortcuts td {
+  padding: 6px 12px 6px 0;
+  border-bottom: 1px dashed #e2e8f0;
+  color: #475569;
+  vertical-align: top;
+}
+
+.help-shortcuts td:first-child {
+  white-space: nowrap;
+  width: 1%;
+}
+
+.help-section kbd,
+.help-shortcuts kbd {
+  display: inline-block;
+  padding: 2px 7px;
+  margin: 0 2px;
+  border: 1px solid #cbd5e1;
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: #f8fafc;
+  font-family: ui-monospace, "SF Mono", Consolas, monospace;
+  font-size: 0.85em;
+  color: #1e293b;
 }

@@ -10,12 +10,13 @@
       <section class="toolbar" aria-label="圖片工具列">
         <div>
           <p class="eyebrow">Local image editor</p>
-          <h1>圖片工具</h1>
-          <p class="toolbar-copy">純前端、多圖處理、可直接部署在 GitHub Pages。</p>
+          <h1>圖片工具 <span class="privacy-badge" title="所有處理都在你的瀏覽器內完成，不會上傳任何資料">🔒 100% 本機</span></h1>
+          <p class="toolbar-copy">遮蔽、裁切、切片、輸出 — 完全在你的瀏覽器內處理，不上傳。</p>
         </div>
 
         <div class="toolbar-actions">
-          <label class="file-button">
+          <button id="helpButton" type="button" class="ghost-button" title="查看使用說明與快捷鍵 (?)">使用說明</button>
+          <label class="file-button" title="支援 JPG / PNG / WebP / PDF，可一次選多張">
             <input id="fileInput" type="file" accept="image/*,application/pdf" multiple />
             新增圖片
           </label>
@@ -30,10 +31,14 @@
           </div>
 
           <section id="editPanel" class="tool-panel">
+            <div class="section-heading">
+              <span>1 · 框選範圍</span>
+              <span>選一種方式</span>
+            </div>
             <div class="selection-mode-tabs" role="tablist" aria-label="選取模式">
-              <button id="rectModeButton" class="mini-tab is-active" type="button">矩形</button>
-              <button id="brushModeButton" class="mini-tab" type="button">筆刷</button>
-              <button id="polygonModeButton" class="mini-tab" type="button">多邊形</button>
+              <button id="rectModeButton" class="mini-tab is-active" type="button" title="拖曳出一個長方形，最常用">矩形</button>
+              <button id="brushModeButton" class="mini-tab" type="button" title="按住滑鼠塗抹任意形狀，適合不規則範圍">筆刷</button>
+              <button id="polygonModeButton" class="mini-tab" type="button" title="連續點擊建立折線，最後點起點封口">多邊形</button>
             </div>
 
             <div id="brushSizeGroup" class="control-group" hidden>
@@ -49,11 +54,15 @@
               <button id="cancelPolygonButton" type="button" disabled>取消多邊形</button>
             </div>
 
+            <div class="section-heading">
+              <span>2 · 選遮蔽效果</span>
+              <span>四種任選</span>
+            </div>
             <div class="tool-choices" role="tablist" aria-label="遮蔽效果">
-              <button id="mosaicToolButton" class="mini-tab is-active" type="button">馬賽克</button>
-              <button id="blurToolButton" class="mini-tab" type="button">模糊</button>
-              <button id="blackoutToolButton" class="mini-tab" type="button">黑條</button>
-              <button id="coverToolButton" class="mini-tab" type="button">純色</button>
+              <button id="mosaicToolButton" class="mini-tab is-active" type="button" title="像素化方塊遮蔽，適合一般文字、頭像">馬賽克</button>
+              <button id="blurToolButton" class="mini-tab" type="button" title="柔化處理，看不清細節但保留輪廓">模糊</button>
+              <button id="blackoutToolButton" class="mini-tab" type="button" title="實心黑色覆蓋，最徹底但最明顯">黑條</button>
+              <button id="coverToolButton" class="mini-tab" type="button" title="可自選顏色覆蓋">純色</button>
             </div>
 
             <div class="control-group">
@@ -76,9 +85,9 @@
             </div>
 
             <div class="action-grid">
-              <button id="applyButton" type="button" disabled>套用全部馬賽克</button>
-              <button id="removeLastSelectionButton" type="button" disabled>刪除最後一個</button>
-              <button id="clearSelectionButton" type="button" disabled>清除全部選取</button>
+              <button id="applyButton" type="button" disabled title="把目前選的遮蔽效果套用到所有選區 (Enter)">套用全部馬賽克</button>
+              <button id="removeLastSelectionButton" type="button" disabled title="刪除最新的一個選區 (Backspace / Delete)">刪除最後一個</button>
+              <button id="clearSelectionButton" type="button" disabled title="清除所有選區 (Esc)">清除全部選取</button>
             </div>
 
             <div class="selection-list-panel">
@@ -104,11 +113,11 @@
                 <span>用最後一個選區裁切</span>
               </div>
               <div class="action-grid transform-grid">
-                <button id="cropButton" type="button" disabled>裁成最後選區</button>
-                <button id="rotateLeftButton" type="button" disabled>左轉 90°</button>
-                <button id="rotateRightButton" type="button" disabled>右轉 90°</button>
-                <button id="flipHorizontalButton" type="button" disabled>水平翻轉</button>
-                <button id="flipVerticalButton" type="button" disabled>垂直翻轉</button>
+                <button id="cropButton" type="button" disabled title="把圖片裁切成最後一個選區的範圍">裁成最後選區</button>
+                <button id="rotateLeftButton" type="button" disabled title="逆時針旋轉 90 度">左轉 90°</button>
+                <button id="rotateRightButton" type="button" disabled title="順時針旋轉 90 度">右轉 90°</button>
+                <button id="flipHorizontalButton" type="button" disabled title="左右翻轉（鏡像）">水平翻轉</button>
+                <button id="flipVerticalButton" type="button" disabled title="上下翻轉">垂直翻轉</button>
               </div>
             </div>
 
@@ -142,9 +151,9 @@
             </div>
 
             <div class="action-grid history-grid">
-              <button id="undoButton" type="button" disabled>復原</button>
-              <button id="redoButton" type="button" disabled>重做</button>
-              <button id="resetButton" type="button" disabled>重置圖片</button>
+              <button id="undoButton" type="button" disabled title="復原上一步 (Cmd/Ctrl+Z)">復原</button>
+              <button id="redoButton" type="button" disabled title="重做 (Cmd/Ctrl+Shift+Z 或 Cmd/Ctrl+Y)">重做</button>
+              <button id="resetButton" type="button" disabled title="把目前圖片還原到一開始載入的狀態">重置圖片</button>
             </div>
           </section>
 
@@ -223,8 +232,8 @@
             </div>
 
             <div class="action-grid">
-              <button id="downloadButton" type="button" disabled>下載目前圖片</button>
-              <button id="downloadAllButton" type="button" disabled>批次下載 ZIP</button>
+              <button id="downloadButton" type="button" disabled title="下載目前正在編輯的這張圖片 (Cmd/Ctrl+S)">下載目前圖片</button>
+              <button id="downloadAllButton" type="button" disabled title="把所有圖片打包成一個 ZIP 下載 (Cmd/Ctrl+Shift+S)">批次下載 ZIP</button>
             </div>
           </section>
         </aside>
@@ -246,14 +255,83 @@
               <canvas id="imageCanvas" aria-label="圖片畫布"></canvas>
               <div id="emptyState" class="empty-state">
                 <div class="sample-image" aria-hidden="true"></div>
-                <h2>把圖片拖到這裡</h2>
-                <p>支援 JPG、PNG、WebP、PDF。新增多張後可從上方縮圖列切換，所有處理都在本機完成。</p>
+                <h2>把圖片拖到這裡開始</h2>
+                <p>支援 JPG、PNG、WebP、PDF — 也可以直接 <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>V</kbd> 從剪貼簿貼上。</p>
+                <ol class="workflow-steps" aria-label="使用流程">
+                  <li><span class="step-num">1</span>拖入圖片</li>
+                  <li><span class="step-num">2</span>框選範圍</li>
+                  <li><span class="step-num">3</span>套用效果</li>
+                  <li><span class="step-num">4</span>下載成果</li>
+                </ol>
+                <p class="trust-line">不上傳 · 不存伺服器 · 關掉視窗就消失</p>
               </div>
             </div>
           </section>
         </section>
       </section>
     </main>
+
+    <dialog id="helpDialog" class="help-dialog" aria-labelledby="helpDialogTitle">
+      <div class="help-dialog-body">
+        <header class="help-dialog-header">
+          <h2 id="helpDialogTitle">使用說明</h2>
+          <button id="helpCloseButton" type="button" class="ghost-button" aria-label="關閉說明">關閉</button>
+        </header>
+
+        <section class="help-section">
+          <h3>四步工作流程</h3>
+          <ol class="help-flow">
+            <li><strong>放入圖片</strong>：拖入、點「新增圖片」、或從剪貼簿貼上（<kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>V</kbd>）。也支援多頁 PDF。</li>
+            <li><strong>框選範圍</strong>：在圖片上拖出選區，可重複建立多個。</li>
+            <li><strong>選遮蔽效果</strong>：馬賽克、模糊、黑條、純色任挑一種，按「套用」一次套到全部選區。</li>
+            <li><strong>下載</strong>：可下載目前圖片，或批次 ZIP 下載全部。</li>
+          </ol>
+        </section>
+
+        <section class="help-section">
+          <h3>三種選取方式</h3>
+          <ul class="help-list">
+            <li><strong>矩形</strong>：拖曳出一個長方形 — 最常用，適合文字、頭像、條碼。</li>
+            <li><strong>筆刷</strong>：按住塗抹任意形狀 — 適合不規則的範圍，可調筆刷大小。</li>
+            <li><strong>多邊形</strong>：連續點擊建立折線，最後點起點或按「完成」封口。</li>
+          </ul>
+        </section>
+
+        <section class="help-section">
+          <h3>四種遮蔽效果</h3>
+          <ul class="help-list">
+            <li><strong>馬賽克</strong>：像素化方塊 — 看不清細節但保留色塊輪廓，最自然。</li>
+            <li><strong>模糊</strong>：高斯模糊 — 比馬賽克更柔，適合背景虛化或臉部。</li>
+            <li><strong>黑條</strong>：實心黑色覆蓋 — 最徹底，連色塊都看不到。</li>
+            <li><strong>純色</strong>：自選顏色覆蓋 — 可指定品牌色或配合整體設計。</li>
+          </ul>
+        </section>
+
+        <section class="help-section">
+          <h3>鍵盤快捷鍵</h3>
+          <table class="help-shortcuts">
+            <tbody>
+              <tr><td><kbd>Cmd</kbd>/<kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td>復原上一步</td></tr>
+              <tr><td><kbd>Cmd</kbd>/<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></td><td>重做</td></tr>
+              <tr><td><kbd>Cmd</kbd>/<kbd>Ctrl</kbd>+<kbd>Y</kbd></td><td>重做（替代）</td></tr>
+              <tr><td><kbd>Cmd</kbd>/<kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>下載目前圖片</td></tr>
+              <tr><td><kbd>Cmd</kbd>/<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></td><td>批次下載 ZIP</td></tr>
+              <tr><td><kbd>Cmd</kbd>/<kbd>Ctrl</kbd>+<kbd>V</kbd></td><td>從剪貼簿貼上圖片</td></tr>
+              <tr><td><kbd>Enter</kbd></td><td>套用遮蔽效果</td></tr>
+              <tr><td><kbd>Esc</kbd></td><td>清除全部選區（或取消多邊形）</td></tr>
+              <tr><td><kbd>Delete</kbd> / <kbd>Backspace</kbd></td><td>刪除最後一個選區</td></tr>
+              <tr><td><kbd>?</kbd></td><td>開啟這份說明</td></tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section class="help-section">
+          <h3>關於隱私</h3>
+          <p>所有圖片處理（讀取、編輯、輸出）都在你的瀏覽器內完成，沒有任何資料傳到伺服器。即使網路斷線，這個工具大部分功能仍能運作。關掉瀏覽器分頁後，所有圖片與選區都會消失，不會留下任何痕跡。</p>
+        </section>
+      </div>
+    </dialog>
+
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
