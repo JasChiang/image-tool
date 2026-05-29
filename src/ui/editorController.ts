@@ -151,6 +151,7 @@ type EditorElements = {
   measureResult: HTMLElement;
   measureResetButton: HTMLButtonElement;
   measureApplyButton: HTMLButtonElement;
+  autoDetectButton: HTMLButtonElement;
   exportName: HTMLInputElement;
   exportFormat: HTMLSelectElement;
   exportQuality: HTMLInputElement;
@@ -340,8 +341,17 @@ export function createEditorController(elements: EditorElements): void {
 
   const getCurrentBitmap = (): ImageBitmap | null => getActiveEntry()?.document.bitmap ?? null;
   const getOriginalBitmap = (): ImageBitmap | null => getActiveEntry()?.document.originalBitmap ?? null;
-  const getDisplayBitmap = (): ImageBitmap | null =>
-    elements.compareToggle.checked ? getOriginalBitmap() ?? getCurrentBitmap() : getCurrentBitmap();
+  const getDisplayBitmap = (): ImageBitmap | null => getCurrentBitmap();
+  const isCompareSplitActive = (): boolean => {
+    if (!elements.compareToggle.checked) {
+      return false;
+    }
+    const current = getCurrentBitmap();
+    const original = getOriginalBitmap();
+    return !!(current && original && current !== original);
+  };
+  let comparePosition = 0.5;
+  let isDraggingCompare = false;
 
   const getActiveToolConfig = () => TOOL_CONFIG[activeToolId];
 
@@ -573,6 +583,11 @@ export function createEditorController(elements: EditorElements): void {
     elements.applyLogoButton.disabled = !hasImage || !logoBitmap || isBusy;
     elements.applyLogoAllButton.disabled = images.length === 0 || !logoBitmap || isBusy;
     elements.measureXButton.disabled = !logoBitmap || isBusy;
+    const detectorAvailable = typeof (window as unknown as { BarcodeDetector?: unknown }).BarcodeDetector !== "undefined";
+    elements.autoDetectButton.disabled = !hasImage || isBusy || !detectorAvailable;
+    if (!detectorAvailable) {
+      elements.autoDetectButton.title = "目前的瀏覽器不支援內建 BarcodeDetector（Chrome / Edge / Safari 較新版本可用）";
+    }
     updateLogoUi();
     elements.downloadButton.disabled = !hasImage || isBusy;
     elements.copyToClipboardButton.disabled = !hasImage || isBusy;
@@ -728,6 +743,84 @@ export function createEditorController(elements: EditorElements): void {
     return canvas;
   };
 
+  const drawCompareSplit = (bitmap: ImageBitmap): void => {
+    const original = getOriginalBitmap();
+    if (!original) {
+      return;
+    }
+    const ctx = context;
+    const drawX = viewport.offsetX;
+    const drawY = viewport.offsetY;
+    const drawW = bitmap.width * viewport.scale;
+    const drawH = bitmap.height * viewport.scale;
+    const splitX = drawX + drawW * comparePosition;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(drawX, drawY, splitX - drawX, drawH);
+    ctx.clip();
+    ctx.drawImage(bitmap, drawX, drawY, drawW, drawH);
+    ctx.restore();
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(splitX, drawY, drawX + drawW - splitX, drawH);
+    ctx.clip();
+    ctx.drawImage(original, drawX, drawY, drawW, drawH);
+    ctx.restore();
+
+    ctx.save();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "rgba(15, 23, 42, 0.5)";
+    ctx.beginPath();
+    ctx.moveTo(splitX, drawY);
+    ctx.lineTo(splitX, drawY + drawH);
+    ctx.stroke();
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.moveTo(splitX, drawY);
+    ctx.lineTo(splitX, drawY + drawH);
+    ctx.stroke();
+
+    const handleY = drawY + drawH / 2;
+    const handleR = 22;
+    ctx.fillStyle = "#ffffff";
+    ctx.strokeStyle = "rgba(15, 23, 42, 0.55)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(splitX, handleY, handleR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#1f2937";
+    ctx.font = "600 14px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("◀ ▶", splitX, handleY);
+
+    ctx.font = "600 12px system-ui, sans-serif";
+    ctx.fillStyle = "rgba(15, 23, 42, 0.85)";
+    ctx.textAlign = "left";
+    ctx.fillText("編輯後", drawX + 8, drawY + 18);
+    ctx.textAlign = "right";
+    ctx.fillText("原圖", drawX + drawW - 8, drawY + 18);
+    ctx.restore();
+  };
+
+  const updateComparePositionFromEvent = (event: PointerEvent): void => {
+    const bitmap = getCurrentBitmap();
+    if (!bitmap) {
+      return;
+    }
+    const bounds = elements.canvas.getBoundingClientRect();
+    const relativeX = event.clientX - bounds.left;
+    const drawX = viewport.offsetX;
+    const drawW = bitmap.width * viewport.scale;
+    const ratio = (relativeX - drawX) / drawW;
+    comparePosition = Math.max(0, Math.min(1, ratio));
+    render();
+  };
+
   const render = () => {
     const bitmap = getDisplayBitmap();
     updateWorkspaceFrame(bitmap);
@@ -749,6 +842,12 @@ export function createEditorController(elements: EditorElements): void {
 
     viewport = getViewport(bitmap, bounds.width, bounds.height);
     context.imageSmoothingEnabled = true;
+    const splitActive = isCompareSplitActive();
+    if (splitActive) {
+      drawCompareSplit(bitmap);
+      updateControls();
+      return;
+    }
     context.drawImage(
       bitmap,
       viewport.offsetX,
@@ -1687,6 +1786,13 @@ export function createEditorController(elements: EditorElements): void {
       return;
     }
 
+    if (isCompareSplitActive()) {
+      isDraggingCompare = true;
+      elements.canvas.setPointerCapture(event.pointerId);
+      updateComparePositionFromEvent(event);
+      return;
+    }
+
     const point = toImagePoint(event, elements.canvas, viewport);
     if (mode === "slice") {
       addPendingCutLine(point, bitmap);
@@ -1752,6 +1858,11 @@ export function createEditorController(elements: EditorElements): void {
       return;
     }
 
+    if (isDraggingCompare) {
+      updateComparePositionFromEvent(event);
+      return;
+    }
+
     const point = toImagePoint(event, elements.canvas, viewport);
 
     if (interaction.kind === "moving") {
@@ -1804,6 +1915,14 @@ export function createEditorController(elements: EditorElements): void {
 
   elements.canvas.addEventListener("pointerup", (event) => {
     if (isBusy) {
+      return;
+    }
+
+    if (isDraggingCompare) {
+      isDraggingCompare = false;
+      if (elements.canvas.hasPointerCapture(event.pointerId)) {
+        elements.canvas.releasePointerCapture(event.pointerId);
+      }
       return;
     }
 
@@ -1862,6 +1981,67 @@ export function createEditorController(elements: EditorElements): void {
   });
 
   elements.applyButton.addEventListener("click", applyCurrentTool);
+
+  elements.autoDetectButton.addEventListener("click", async () => {
+    const bitmap = getCurrentBitmap();
+    if (!bitmap || isBusy) {
+      return;
+    }
+    const DetectorCtor = (window as unknown as {
+      BarcodeDetector?: new (opts?: { formats?: string[] }) => {
+        detect: (img: ImageBitmap) => Promise<Array<{ boundingBox: DOMRectReadOnly; format: string; rawValue: string }>>;
+      };
+    }).BarcodeDetector;
+    if (!DetectorCtor) {
+      reportError(new Error("瀏覽器不支援自動偵測，請改手動框選"), "");
+      return;
+    }
+    try {
+      setBusy(true, "自動掃描 QR / 條碼中...");
+      const detector = new DetectorCtor({
+        formats: ["qr_code", "ean_13", "ean_8", "code_128", "code_39", "data_matrix", "aztec", "pdf417", "upc_a", "upc_e", "itf"]
+      });
+      const found = await detector.detect(bitmap);
+      setBusy(false);
+      if (found.length === 0) {
+        elements.processingStatus.textContent = "沒有偵測到 QR / 條碼，請手動框選。";
+        window.setTimeout(() => {
+          if (!isBusy && !elements.processingStatus.classList.contains("is-error")) {
+            elements.processingStatus.textContent = "所有處理都在本機瀏覽器完成，不會上傳圖片。";
+          }
+        }, 3500);
+        return;
+      }
+      let added = 0;
+      for (const detection of found) {
+        const padding = Math.max(8, Math.min(detection.boundingBox.width, detection.boundingBox.height) * 0.08);
+        const rect: Rect = {
+          x: Math.max(0, detection.boundingBox.x - padding),
+          y: Math.max(0, detection.boundingBox.y - padding),
+          width: Math.min(bitmap.width, detection.boundingBox.width + padding * 2),
+          height: Math.min(bitmap.height, detection.boundingBox.height + padding * 2)
+        };
+        const newSel: SelectionShape = {
+          id: crypto.randomUUID(),
+          kind: "rect",
+          rect
+        };
+        tagNewSelection(newSel);
+        selections = [...selections, newSel];
+        added += 1;
+      }
+      elements.processingStatus.textContent = `✓ 偵測到 ${added} 個條碼 / QR，已加進選區清單`;
+      window.setTimeout(() => {
+        if (!isBusy && !elements.processingStatus.classList.contains("is-error")) {
+          elements.processingStatus.textContent = "所有處理都在本機瀏覽器完成，不會上傳圖片。";
+        }
+      }, 3500);
+      render();
+    } catch (error) {
+      setBusy(false);
+      reportError(error, "自動偵測失敗，請手動框選");
+    }
+  });
   elements.removeLastSelectionButton.addEventListener("click", () => {
     if (selections.length === 0 || isBusy) {
       return;

@@ -69,6 +69,7 @@ const measureCanvas = document.querySelector<HTMLCanvasElement>("#measureCanvas"
 const measureResult = document.querySelector<HTMLElement>("#measureResult");
 const measureResetButton = document.querySelector<HTMLButtonElement>("#measureResetButton");
 const measureApplyButton = document.querySelector<HTMLButtonElement>("#measureApplyButton");
+const autoDetectButton = document.querySelector<HTMLButtonElement>("#autoDetectButton");
 const exportName = document.querySelector<HTMLInputElement>("#exportName");
 const exportFormat = document.querySelector<HTMLSelectElement>("#exportFormat");
 const exportQuality = document.querySelector<HTMLInputElement>("#exportQuality");
@@ -174,6 +175,7 @@ if (
   !measureResult ||
   !measureResetButton ||
   !measureApplyButton ||
+  !autoDetectButton ||
   !cellSize ||
   !cellSizeValue ||
   !effectHint ||
@@ -287,6 +289,7 @@ createEditorController({
   measureResult,
   measureResetButton,
   measureApplyButton,
+  autoDetectButton,
   cellSize,
   cellSizeValue,
   effectHint,

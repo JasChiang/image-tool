@@ -470,6 +470,20 @@ output {
   justify-content: center;
 }
 
+.auto-detect-button {
+  width: 100%;
+  justify-content: center;
+  background: #f0fdfa;
+  color: #115e59;
+  border-color: #99f6e4;
+  font-weight: 500;
+}
+
+.auto-detect-button:hover:not(:disabled) {
+  background: #ccfbf1;
+  border-color: #5eead4;
+}
+
 .measure-dialog {
   border: none;
   padding: 0;

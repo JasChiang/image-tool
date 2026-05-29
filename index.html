@@ -83,6 +83,11 @@
               </button>
             </div>
 
+            <button id="autoDetectButton" type="button" class="icon-button auto-detect-button" disabled title="用瀏覽器內建 BarcodeDetector 找出畫面上的 QR / 條碼，自動框起來">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/></svg>
+              自動偵測 QR / 條碼
+            </button>
+
             <div class="apply-row">
               <label class="checkbox-row apply-scope" id="applyScopeRow" hidden>
                 <input id="applyToAllImagesToggle" type="checkbox" />
@@ -132,7 +137,7 @@
                 </div>
                 <label class="checkbox-row">
                   <input id="compareToggle" type="checkbox" />
-                  按住顯示原圖比較
+                  拖滑桿對比原圖（左：編輯後，右：原圖）
                 </label>
                 <div class="inline-control">
                   <label for="workspaceSize">畫面縮放</label>
