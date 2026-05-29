@@ -180,6 +180,30 @@
 
             <details class="collapsible-section">
               <summary>
+                <span class="collapsible-title">文字標註</span>
+                <span class="collapsible-hint" id="annotationCountHint">0 個</span>
+              </summary>
+              <div class="collapsible-body">
+                <div class="inline-control">
+                  <label for="annotationColor">顏色</label>
+                  <input id="annotationColor" type="color" value="#dc2626" />
+                  <output>實心</output>
+                </div>
+                <div class="inline-control">
+                  <label for="annotationSize">大小</label>
+                  <input id="annotationSize" type="range" min="2" max="12" step="0.5" value="4" />
+                  <output id="annotationSizeValue">4%</output>
+                </div>
+                <button id="addAnnotationButton" type="button" class="icon-button add-annotation-button" disabled>
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M12 7v12M8 7l-1-3h10l-1 3"/></svg>
+                  加文字 — 然後點圖片位置
+                </button>
+                <div id="annotationList" class="annotation-list" hidden></div>
+              </div>
+            </details>
+
+            <details class="collapsible-section">
+              <summary>
                 <span class="collapsible-title">品牌 Logo</span>
                 <span class="collapsible-hint" id="logoStatusHint">未載入 logo</span>
               </summary>

@@ -531,6 +531,42 @@ output {
   font-variant-numeric: tabular-nums;
 }
 
+.add-annotation-button {
+  width: 100%;
+  justify-content: center;
+}
+
+.annotation-list {
+  display: grid;
+  gap: 6px;
+}
+
+.annotation-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.annotation-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  border: 1px solid rgba(15, 23, 42, 0.2);
+}
+
+.annotation-item span {
+  font-size: 0.86rem;
+  color: #1f2937;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .pan-hint {
   position: absolute;
   top: 12px;

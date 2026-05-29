@@ -158,6 +158,12 @@ type EditorElements = {
   zoomResetButton: HTMLButtonElement;
   zoomLevelText: HTMLElement;
   panHint: HTMLElement;
+  annotationColor: HTMLInputElement;
+  annotationSize: HTMLInputElement;
+  annotationSizeValue: HTMLOutputElement;
+  addAnnotationButton: HTMLButtonElement;
+  annotationList: HTMLElement;
+  annotationCountHint: HTMLElement;
   exportName: HTMLInputElement;
   exportFormat: HTMLSelectElement;
   exportQuality: HTMLInputElement;
@@ -367,6 +373,10 @@ export function createEditorController(elements: EditorElements): void {
   let panStartOffset: Point | null = null;
   const MIN_ZOOM = 0.5;
   const MAX_ZOOM = 8;
+
+  type Annotation = { id: string; x: number; y: number; text: string; color: string; sizePercent: number };
+  let annotations: Annotation[] = [];
+  let placingAnnotation = false;
 
   const resetZoomAndPan = () => {
     zoomLevel = 1;
@@ -606,6 +616,7 @@ export function createEditorController(elements: EditorElements): void {
     elements.applyLogoButton.disabled = !hasImage || !logoBitmap || isBusy;
     elements.applyLogoAllButton.disabled = images.length === 0 || !logoBitmap || isBusy;
     elements.measureXButton.disabled = !logoBitmap || isBusy;
+    elements.addAnnotationButton.disabled = !hasImage || isBusy;
     elements.zoomControls.hidden = !hasImage;
     elements.zoomLevelText.textContent = `${Math.round(zoomLevel * 100)}%`;
     elements.zoomInButton.disabled = zoomLevel >= MAX_ZOOM || isBusy;
@@ -637,6 +648,7 @@ export function createEditorController(elements: EditorElements): void {
     elements.workspaceSizeValue.value = `${elements.workspaceSize.value}%`;
     elements.gridSizeValue.value = `${elements.gridSize.value} px`;
     renderSelectionList();
+    renderAnnotationList();
     renderImageList();
     updateActiveMeta();
     syncToolUi();
@@ -772,6 +784,47 @@ export function createEditorController(elements: EditorElements): void {
     return canvas;
   };
 
+  const drawAnnotationsOnCanvas = (ctx: CanvasRenderingContext2D, vp: Viewport, bitmap: ImageBitmap) => {
+    if (annotations.length === 0) {
+      return;
+    }
+    ctx.save();
+    ctx.textBaseline = "top";
+    ctx.textAlign = "left";
+    for (const annotation of annotations) {
+      const fontPx = Math.max(8, bitmap.height * (annotation.sizePercent / 100) * vp.scale);
+      ctx.font = `700 ${fontPx}px system-ui, sans-serif`;
+      const screenX = annotation.x * vp.scale + vp.offsetX;
+      const screenY = annotation.y * vp.scale + vp.offsetY;
+      ctx.lineWidth = Math.max(2, fontPx / 8);
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.95)";
+      ctx.strokeText(annotation.text, screenX, screenY);
+      ctx.fillStyle = annotation.color;
+      ctx.fillText(annotation.text, screenX, screenY);
+    }
+    ctx.restore();
+  };
+
+  const bakeAnnotationsInto = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
+    if (annotations.length === 0) {
+      return;
+    }
+    ctx.save();
+    ctx.textBaseline = "top";
+    ctx.textAlign = "left";
+    for (const annotation of annotations) {
+      const fontPx = Math.max(8, height * (annotation.sizePercent / 100));
+      ctx.font = `700 ${fontPx}px system-ui, sans-serif`;
+      ctx.lineWidth = Math.max(2, fontPx / 8);
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.95)";
+      ctx.strokeText(annotation.text, annotation.x, annotation.y);
+      ctx.fillStyle = annotation.color;
+      ctx.fillText(annotation.text, annotation.x, annotation.y);
+    }
+    ctx.restore();
+    void width;
+  };
+
   const drawCompareSplit = (bitmap: ImageBitmap): void => {
     const original = getOriginalBitmap();
     if (!original) {
@@ -895,6 +948,8 @@ export function createEditorController(elements: EditorElements): void {
         }
       }
 
+      drawAnnotationsOnCanvas(context, viewport, bitmap);
+
       selections.forEach((selection, index) => {
         const isHighlighted = index === highlightedSelectionIndex;
         drawSelectionShape(context, selection, viewport, {
@@ -983,6 +1038,8 @@ export function createEditorController(elements: EditorElements): void {
     activeImageId = id;
     resetEphemeralState();
     resetZoomAndPan();
+    annotations = [];
+    placingAnnotation = false;
     syncExportName();
     render();
   };
@@ -1205,7 +1262,7 @@ export function createEditorController(elements: EditorElements): void {
 
     try {
       setBusy(true, "圖片匯出中...");
-      const blob = await exportBitmap(bitmap, elements.exportFormat.value as ExportFormat, Number(elements.exportQuality.value), getWatermarkConfig());
+      const blob = await exportBitmap(bitmap, elements.exportFormat.value as ExportFormat, Number(elements.exportQuality.value), getWatermarkConfig(), bakeAnnotationsInto);
       downloadBlob(blob, `${sanitizeFileName(elements.exportName.value || getBaseName(activeEntry.name))}.${getFileExtension(elements.exportFormat.value as ExportFormat)}`);
     } catch (error) {
       reportError(error, "下載圖片失敗，請稍後再試。");
@@ -1234,7 +1291,7 @@ export function createEditorController(elements: EditorElements): void {
         processed += 1;
         setBusy(true, `批次 ZIP 產生中 (${processed}/${images.length})...`);
         const format = elements.exportFormat.value as ExportFormat;
-        const blob = await exportBitmap(bitmap, format, Number(elements.exportQuality.value), getWatermarkConfig());
+        const blob = await exportBitmap(bitmap, format, Number(elements.exportQuality.value), getWatermarkConfig(), bakeAnnotationsInto);
         files.push({
           name: `${sanitizeFileName(getBaseName(entry.name))}.${getFileExtension(format)}`,
           data: new Uint8Array(await blob.arrayBuffer())
@@ -1860,6 +1917,47 @@ export function createEditorController(elements: EditorElements): void {
     render();
   });
 
+  const renderAnnotationList = () => {
+    elements.annotationCountHint.textContent = `${annotations.length} 個`;
+    elements.annotationList.hidden = annotations.length === 0;
+    elements.annotationList.innerHTML = annotations
+      .map(
+        (annotation) => `
+          <div class="annotation-item">
+            <span class="annotation-swatch" style="background:${annotation.color}"></span>
+            <span title="${escapeHtml(annotation.text)}">${escapeHtml(annotation.text)}</span>
+            <button type="button" class="selection-remove-button" data-annotation-remove="${annotation.id}" aria-label="刪除這條標註" title="刪除">✕</button>
+          </div>
+        `
+      )
+      .join("");
+  };
+
+  elements.annotationList.addEventListener("click", (event) => {
+    const target = event.target as HTMLElement | null;
+    const btn = target?.closest<HTMLElement>("[data-annotation-remove]");
+    if (!btn) {
+      return;
+    }
+    const id = btn.dataset.annotationRemove;
+    annotations = annotations.filter((annotation) => annotation.id !== id);
+    renderAnnotationList();
+    render();
+  });
+
+  elements.annotationSize.addEventListener("input", () => {
+    elements.annotationSizeValue.value = `${elements.annotationSize.value}%`;
+  });
+
+  elements.addAnnotationButton.addEventListener("click", () => {
+    if (!getCurrentBitmap() || isBusy) {
+      return;
+    }
+    placingAnnotation = true;
+    elements.canvas.style.cursor = "crosshair";
+    elements.processingStatus.textContent = "請點圖片上要放文字標註的位置";
+  });
+
   window.addEventListener("keydown", (event) => {
     if (event.code !== "Space") {
       return;
@@ -1892,6 +1990,30 @@ export function createEditorController(elements: EditorElements): void {
   elements.canvas.addEventListener("pointerdown", (event) => {
     const bitmap = getDisplayBitmap();
     if (!bitmap || isBusy) {
+      return;
+    }
+
+    if (placingAnnotation) {
+      placingAnnotation = false;
+      elements.canvas.style.cursor = "";
+      elements.processingStatus.textContent = "所有處理都在本機瀏覽器完成，不會上傳圖片。";
+      const point = toImagePoint(event, elements.canvas, viewport);
+      const text = window.prompt("輸入文字標註：", "");
+      if (text && text.trim()) {
+        annotations = [
+          ...annotations,
+          {
+            id: crypto.randomUUID(),
+            x: Math.max(0, Math.min(bitmap.width, point.x)),
+            y: Math.max(0, Math.min(bitmap.height, point.y)),
+            text: text.trim(),
+            color: elements.annotationColor.value,
+            sizePercent: Number(elements.annotationSize.value)
+          }
+        ];
+        renderAnnotationList();
+        render();
+      }
       return;
     }
 
@@ -2295,6 +2417,11 @@ export function createEditorController(elements: EditorElements): void {
         throw new Error("Canvas not supported");
       }
       ctx.drawImage(bitmap, 0, 0);
+      bakeAnnotationsInto(ctx, canvas.width, canvas.height);
+      const watermarkCfg = getWatermarkConfig();
+      if (watermarkCfg) {
+        drawWatermark(ctx, canvas.width, canvas.height, watermarkCfg.text, watermarkCfg.position);
+      }
       const blob: Blob = await new Promise((resolve, reject) =>
         canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("blob fail"))), "image/png")
       );
@@ -2867,7 +2994,8 @@ async function exportBitmap(
   bitmap: ImageBitmap,
   format: ExportFormat,
   quality: number,
-  watermark?: { text: string; position: WatermarkPosition }
+  watermark?: { text: string; position: WatermarkPosition },
+  bakeOverlays?: (ctx: CanvasRenderingContext2D, width: number, height: number) => void
 ): Promise<Blob> {
   const canvas = document.createElement("canvas");
   canvas.width = bitmap.width;
@@ -2878,6 +3006,9 @@ async function exportBitmap(
   }
 
   context.drawImage(bitmap, 0, 0);
+  if (bakeOverlays) {
+    bakeOverlays(context, canvas.width, canvas.height);
+  }
   if (watermark && watermark.text.trim()) {
     drawWatermark(context, canvas.width, canvas.height, watermark.text.trim(), watermark.position);
   }

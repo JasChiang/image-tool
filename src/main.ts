@@ -76,6 +76,12 @@ const zoomInButton = document.querySelector<HTMLButtonElement>("#zoomInButton");
 const zoomResetButton = document.querySelector<HTMLButtonElement>("#zoomResetButton");
 const zoomLevelText = document.querySelector<HTMLElement>("#zoomLevelText");
 const panHint = document.querySelector<HTMLElement>("#panHint");
+const annotationColor = document.querySelector<HTMLInputElement>("#annotationColor");
+const annotationSize = document.querySelector<HTMLInputElement>("#annotationSize");
+const annotationSizeValue = document.querySelector<HTMLOutputElement>("#annotationSizeValue");
+const addAnnotationButton = document.querySelector<HTMLButtonElement>("#addAnnotationButton");
+const annotationList = document.querySelector<HTMLElement>("#annotationList");
+const annotationCountHint = document.querySelector<HTMLElement>("#annotationCountHint");
 const exportName = document.querySelector<HTMLInputElement>("#exportName");
 const exportFormat = document.querySelector<HTMLSelectElement>("#exportFormat");
 const exportQuality = document.querySelector<HTMLInputElement>("#exportQuality");
@@ -188,6 +194,12 @@ if (
   !zoomResetButton ||
   !zoomLevelText ||
   !panHint ||
+  !annotationColor ||
+  !annotationSize ||
+  !annotationSizeValue ||
+  !addAnnotationButton ||
+  !annotationList ||
+  !annotationCountHint ||
   !cellSize ||
   !cellSizeValue ||
   !effectHint ||
@@ -308,6 +320,12 @@ createEditorController({
   zoomResetButton,
   zoomLevelText,
   panHint,
+  annotationColor,
+  annotationSize,
+  annotationSizeValue,
+  addAnnotationButton,
+  annotationList,
+  annotationCountHint,
   cellSize,
   cellSizeValue,
   effectHint,
