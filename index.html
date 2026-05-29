@@ -349,6 +349,13 @@
           <section id="canvasPanel" class="canvas-panel" aria-label="圖片編輯區">
             <div id="dropZone" class="drop-zone">
               <canvas id="imageCanvas" aria-label="圖片畫布"></canvas>
+              <div id="zoomControls" class="zoom-controls" hidden aria-label="縮放控制">
+                <button id="zoomOutButton" type="button" title="縮小（Ctrl/⌘+滾輪也可以）" aria-label="縮小">−</button>
+                <span id="zoomLevelText">100%</span>
+                <button id="zoomInButton" type="button" title="放大（Ctrl/⌘+滾輪也可以）" aria-label="放大">+</button>
+                <button id="zoomResetButton" type="button" title="重設縮放與位置">適應</button>
+              </div>
+              <div id="panHint" class="pan-hint" hidden>按住空白鍵拖曳可移動畫面</div>
               <div id="emptyState" class="empty-state">
                 <div class="empty-icon" aria-hidden="true">
                   <svg viewBox="0 0 64 64" width="64" height="64" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">

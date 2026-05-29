@@ -484,6 +484,69 @@ output {
   border-color: #5eead4;
 }
 
+.zoom-controls {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(8px);
+  border-radius: 10px;
+  padding: 4px;
+  gap: 2px;
+  z-index: 5;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.32);
+}
+
+.zoom-controls button {
+  min-height: 32px;
+  min-width: 36px;
+  padding: 4px 10px;
+  background: transparent;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.zoom-controls button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.zoom-controls button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.zoom-controls span {
+  color: #ffffff;
+  font-size: 0.82rem;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  min-width: 50px;
+  justify-content: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.pan-hint {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 14px;
+  background: rgba(15, 118, 110, 0.92);
+  color: #ffffff;
+  font-size: 0.84rem;
+  font-weight: 500;
+  border-radius: 999px;
+  z-index: 5;
+  pointer-events: none;
+  box-shadow: 0 4px 16px rgba(15, 118, 110, 0.4);
+}
+
 .measure-dialog {
   border: none;
   padding: 0;

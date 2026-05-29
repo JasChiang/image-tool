@@ -152,6 +152,12 @@ type EditorElements = {
   measureResetButton: HTMLButtonElement;
   measureApplyButton: HTMLButtonElement;
   autoDetectButton: HTMLButtonElement;
+  zoomControls: HTMLElement;
+  zoomOutButton: HTMLButtonElement;
+  zoomInButton: HTMLButtonElement;
+  zoomResetButton: HTMLButtonElement;
+  zoomLevelText: HTMLElement;
+  panHint: HTMLElement;
   exportName: HTMLInputElement;
   exportFormat: HTMLSelectElement;
   exportQuality: HTMLInputElement;
@@ -352,6 +358,23 @@ export function createEditorController(elements: EditorElements): void {
   };
   let comparePosition = 0.5;
   let isDraggingCompare = false;
+  let zoomLevel = 1;
+  let panX = 0;
+  let panY = 0;
+  let isSpaceDown = false;
+  let isPanning = false;
+  let panStartScreen: Point | null = null;
+  let panStartOffset: Point | null = null;
+  const MIN_ZOOM = 0.5;
+  const MAX_ZOOM = 8;
+
+  const resetZoomAndPan = () => {
+    zoomLevel = 1;
+    panX = 0;
+    panY = 0;
+  };
+
+  const clampZoom = (value: number) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, value));
 
   const getActiveToolConfig = () => TOOL_CONFIG[activeToolId];
 
@@ -583,6 +606,12 @@ export function createEditorController(elements: EditorElements): void {
     elements.applyLogoButton.disabled = !hasImage || !logoBitmap || isBusy;
     elements.applyLogoAllButton.disabled = images.length === 0 || !logoBitmap || isBusy;
     elements.measureXButton.disabled = !logoBitmap || isBusy;
+    elements.zoomControls.hidden = !hasImage;
+    elements.zoomLevelText.textContent = `${Math.round(zoomLevel * 100)}%`;
+    elements.zoomInButton.disabled = zoomLevel >= MAX_ZOOM || isBusy;
+    elements.zoomOutButton.disabled = zoomLevel <= MIN_ZOOM || isBusy;
+    elements.zoomResetButton.disabled = (zoomLevel === 1 && panX === 0 && panY === 0) || isBusy;
+    elements.panHint.hidden = !isSpaceDown || !hasImage;
     const detectorAvailable = typeof (window as unknown as { BarcodeDetector?: unknown }).BarcodeDetector !== "undefined";
     elements.autoDetectButton.disabled = !hasImage || isBusy || !detectorAvailable;
     if (!detectorAvailable) {
@@ -840,7 +869,7 @@ export function createEditorController(elements: EditorElements): void {
       return;
     }
 
-    viewport = getViewport(bitmap, bounds.width, bounds.height);
+    viewport = getViewport(bitmap, bounds.width, bounds.height, zoomLevel, panX, panY);
     context.imageSmoothingEnabled = true;
     const splitActive = isCompareSplitActive();
     if (splitActive) {
@@ -953,6 +982,7 @@ export function createEditorController(elements: EditorElements): void {
 
     activeImageId = id;
     resetEphemeralState();
+    resetZoomAndPan();
     syncExportName();
     render();
   };
@@ -1780,9 +1810,98 @@ export function createEditorController(elements: EditorElements): void {
     }
   });
 
+  const zoomTowardPoint = (factor: number, screenX: number, screenY: number) => {
+    const bitmap = getCurrentBitmap();
+    if (!bitmap) {
+      return;
+    }
+    const newZoom = clampZoom(zoomLevel * factor);
+    if (newZoom === zoomLevel) {
+      return;
+    }
+    const canvasBounds = elements.canvas.getBoundingClientRect();
+    const localX = screenX - canvasBounds.left;
+    const localY = screenY - canvasBounds.top;
+    const imageX = (localX - viewport.offsetX) / viewport.scale;
+    const imageY = (localY - viewport.offsetY) / viewport.scale;
+    zoomLevel = newZoom;
+    const fitScale = Math.min(canvasBounds.width / bitmap.width, canvasBounds.height / bitmap.height);
+    const newScale = fitScale * zoomLevel;
+    const baseOffsetX = (canvasBounds.width - bitmap.width * newScale) / 2;
+    const baseOffsetY = (canvasBounds.height - bitmap.height * newScale) / 2;
+    panX = (localX - baseOffsetX) / newScale - imageX;
+    panY = (localY - baseOffsetY) / newScale - imageY;
+    render();
+  };
+
+  elements.canvas.addEventListener("wheel", (event) => {
+    if (!(event.ctrlKey || event.metaKey)) {
+      return;
+    }
+    event.preventDefault();
+    const factor = event.deltaY < 0 ? 1.12 : 1 / 1.12;
+    zoomTowardPoint(factor, event.clientX, event.clientY);
+  }, { passive: false });
+
+  const centerOfCanvas = () => {
+    const r = elements.canvas.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  };
+  elements.zoomInButton.addEventListener("click", () => {
+    const c = centerOfCanvas();
+    zoomTowardPoint(1.25, c.x, c.y);
+  });
+  elements.zoomOutButton.addEventListener("click", () => {
+    const c = centerOfCanvas();
+    zoomTowardPoint(1 / 1.25, c.x, c.y);
+  });
+  elements.zoomResetButton.addEventListener("click", () => {
+    resetZoomAndPan();
+    render();
+  });
+
+  window.addEventListener("keydown", (event) => {
+    if (event.code !== "Space") {
+      return;
+    }
+    const target = event.target as HTMLElement | null;
+    if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.isContentEditable)) {
+      return;
+    }
+    if (isSpaceDown) {
+      event.preventDefault();
+      return;
+    }
+    isSpaceDown = true;
+    elements.canvas.style.cursor = "grab";
+    elements.panHint.hidden = false;
+    event.preventDefault();
+  });
+
+  window.addEventListener("keyup", (event) => {
+    if (event.code !== "Space") {
+      return;
+    }
+    isSpaceDown = false;
+    if (!isPanning) {
+      elements.canvas.style.cursor = "";
+    }
+    elements.panHint.hidden = true;
+  });
+
   elements.canvas.addEventListener("pointerdown", (event) => {
     const bitmap = getDisplayBitmap();
     if (!bitmap || isBusy) {
+      return;
+    }
+
+    if (isSpaceDown || event.button === 1) {
+      isPanning = true;
+      panStartScreen = { x: event.clientX, y: event.clientY };
+      panStartOffset = { x: panX, y: panY };
+      elements.canvas.setPointerCapture(event.pointerId);
+      elements.canvas.style.cursor = "grabbing";
+      event.preventDefault();
       return;
     }
 
@@ -1858,6 +1977,15 @@ export function createEditorController(elements: EditorElements): void {
       return;
     }
 
+    if (isPanning && panStartScreen && panStartOffset) {
+      const dx = (event.clientX - panStartScreen.x) / viewport.scale;
+      const dy = (event.clientY - panStartScreen.y) / viewport.scale;
+      panX = panStartOffset.x + dx;
+      panY = panStartOffset.y + dy;
+      render();
+      return;
+    }
+
     if (isDraggingCompare) {
       updateComparePositionFromEvent(event);
       return;
@@ -1923,6 +2051,17 @@ export function createEditorController(elements: EditorElements): void {
       if (elements.canvas.hasPointerCapture(event.pointerId)) {
         elements.canvas.releasePointerCapture(event.pointerId);
       }
+      return;
+    }
+
+    if (isPanning) {
+      isPanning = false;
+      panStartScreen = null;
+      panStartOffset = null;
+      if (elements.canvas.hasPointerCapture(event.pointerId)) {
+        elements.canvas.releasePointerCapture(event.pointerId);
+      }
+      elements.canvas.style.cursor = isSpaceDown ? "grab" : "";
       return;
     }
 
@@ -2471,15 +2610,23 @@ async function applyToolToRegions(
   return result;
 }
 
-function getViewport(bitmap: ImageBitmap, width: number, height: number): Viewport {
-  const scale = Math.min(width / bitmap.width, height / bitmap.height);
+function getViewport(
+  bitmap: ImageBitmap,
+  width: number,
+  height: number,
+  zoom = 1,
+  panX = 0,
+  panY = 0
+): Viewport {
+  const fitScale = Math.min(width / bitmap.width, height / bitmap.height);
+  const scale = fitScale * zoom;
   const renderedWidth = bitmap.width * scale;
   const renderedHeight = bitmap.height * scale;
 
   return {
     scale,
-    offsetX: (width - renderedWidth) / 2,
-    offsetY: (height - renderedHeight) / 2
+    offsetX: (width - renderedWidth) / 2 + panX * scale,
+    offsetY: (height - renderedHeight) / 2 + panY * scale
   };
 }
 

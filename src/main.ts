@@ -70,6 +70,12 @@ const measureResult = document.querySelector<HTMLElement>("#measureResult");
 const measureResetButton = document.querySelector<HTMLButtonElement>("#measureResetButton");
 const measureApplyButton = document.querySelector<HTMLButtonElement>("#measureApplyButton");
 const autoDetectButton = document.querySelector<HTMLButtonElement>("#autoDetectButton");
+const zoomControls = document.querySelector<HTMLElement>("#zoomControls");
+const zoomOutButton = document.querySelector<HTMLButtonElement>("#zoomOutButton");
+const zoomInButton = document.querySelector<HTMLButtonElement>("#zoomInButton");
+const zoomResetButton = document.querySelector<HTMLButtonElement>("#zoomResetButton");
+const zoomLevelText = document.querySelector<HTMLElement>("#zoomLevelText");
+const panHint = document.querySelector<HTMLElement>("#panHint");
 const exportName = document.querySelector<HTMLInputElement>("#exportName");
 const exportFormat = document.querySelector<HTMLSelectElement>("#exportFormat");
 const exportQuality = document.querySelector<HTMLInputElement>("#exportQuality");
@@ -176,6 +182,12 @@ if (
   !measureResetButton ||
   !measureApplyButton ||
   !autoDetectButton ||
+  !zoomControls ||
+  !zoomOutButton ||
+  !zoomInButton ||
+  !zoomResetButton ||
+  !zoomLevelText ||
+  !panHint ||
   !cellSize ||
   !cellSizeValue ||
   !effectHint ||
@@ -290,6 +302,12 @@ createEditorController({
   measureResetButton,
   measureApplyButton,
   autoDetectButton,
+  zoomControls,
+  zoomOutButton,
+  zoomInButton,
+  zoomResetButton,
+  zoomLevelText,
+  panHint,
   cellSize,
   cellSizeValue,
   effectHint,
