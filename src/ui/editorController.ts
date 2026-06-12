@@ -1421,6 +1421,38 @@ export function createEditorController(elements: EditorElements): void {
     await addFiles(dataTransfer.files);
   });
 
+  // ?src=<圖片網址> 自動載入（供外部工具連動，例如 EDM 製圖所的「送去切版」），
+  // 搭配 &tab=slice 直接切到切版分頁。來源需允許 CORS。
+  void (async () => {
+    const params = new URLSearchParams(window.location.search);
+    const src = params.get("src");
+    if (!src) {
+      return;
+    }
+    try {
+      setBusy(true, "載入外部圖片中...");
+      const response = await fetch(src);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const blob = await response.blob();
+      const name =
+        decodeURIComponent(src.split("/").pop() ?? "image.png").split("?")[0] || "image.png";
+      const file = new File([blob], name, { type: blob.type || "image/png" });
+      const dataTransfer = new DataTransfer();
+      dataTransfer.items.add(file);
+      await addFiles(dataTransfer.files);
+      if (params.get("tab") === "slice") {
+        mode = "slice";
+        clearSelections();
+        render();
+      }
+    } catch (error) {
+      console.error("載入 ?src 圖片失敗", error);
+      setBusy(false);
+    }
+  })();
+
   elements.fileInput.addEventListener("change", async () => {
     await addFiles(elements.fileInput.files);
   });
