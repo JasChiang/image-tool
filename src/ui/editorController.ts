@@ -17,12 +17,15 @@ import { blackoutTool } from "../tools/blackoutTool";
 import { blurTool } from "../tools/blurTool";
 import { coverTool } from "../tools/coverTool";
 import { mosaicTool } from "../tools/mosaicTool";
+import { boxTool } from "../tools/boxTool";
+import { highlightTool } from "../tools/highlightTool";
+import { spotlightTool } from "../tools/spotlightTool";
 import type { EditorTool } from "../tools/editorTool";
 
 type ExportFormat = "png" | "jpeg" | "webp" | "pdf";
 type EditorMode = "edit" | "slice";
 type PendingCutLine = "vertical" | "horizontal" | null;
-type ToolId = "mosaic" | "blur" | "blackout" | "cover";
+type ToolId = "mosaic" | "blur" | "blackout" | "cover" | "box" | "highlight" | "spotlight";
 type SelectionMode = "rect" | "brush" | "polygon";
 
 type ResizeHandle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
@@ -63,7 +66,7 @@ type WatermarkPosition = "br" | "bl" | "tr" | "tl" | "center" | "tile";
 type UiSettings = {
   activeToolId: ToolId;
   selectionMode: SelectionMode;
-  strengthValues: Record<"mosaic" | "blur", number>;
+  strengthValues: Record<string, number>;
   coverColor: string;
   brushSize: number;
   exportFormat: ExportFormat;
@@ -112,6 +115,9 @@ type EditorElements = {
   blurToolButton: HTMLButtonElement;
   blackoutToolButton: HTMLButtonElement;
   coverToolButton: HTMLButtonElement;
+  boxToolButton: HTMLButtonElement;
+  highlightToolButton: HTMLButtonElement;
+  spotlightToolButton: HTMLButtonElement;
   effectStrengthLabel: HTMLLabelElement;
   effectStrengthGroup: HTMLElement;
   cellSize: HTMLInputElement;
@@ -162,6 +168,9 @@ type EditorElements = {
   annotationSize: HTMLInputElement;
   annotationSizeValue: HTMLOutputElement;
   addAnnotationButton: HTMLButtonElement;
+  addArrowButton: HTMLButtonElement;
+  addCalloutButton: HTMLButtonElement;
+  calloutScale: HTMLSelectElement;
   annotationList: HTMLElement;
   annotationCountHint: HTMLElement;
   exportName: HTMLInputElement;
@@ -213,7 +222,10 @@ const DEFAULT_SETTINGS: UiSettings = {
   selectionMode: "rect",
   strengthValues: {
     mosaic: 18,
-    blur: 12
+    blur: 12,
+    box: 6,
+    highlight: 35,
+    spotlight: 60
   },
   coverColor: "#111827",
   brushSize: 18,
@@ -237,6 +249,7 @@ const TEMPLATE_PRESETS: Record<string, { label: string; width: number; height: n
 const TOOL_CONFIG: Record<ToolId, {
   tool: EditorTool;
   label: string;
+  short: string;
   hint: string;
   min: number;
   max: number;
@@ -244,50 +257,98 @@ const TOOL_CONFIG: Record<ToolId, {
   suffix: string;
   buttonLabel: string;
   usesStrength: boolean;
+  usesColor: boolean;
 }> = {
   mosaic: {
     tool: mosaicTool,
     label: "馬賽克格子",
+    short: "馬賽克",
     hint: "拖曳多個區域後，一次套用像素化遮蔽。",
     min: 4,
     max: 80,
     defaultValue: 18,
     suffix: "px",
     buttonLabel: "套用全部馬賽克",
-    usesStrength: true
+    usesStrength: true,
+    usesColor: false
   },
   blur: {
     tool: blurTool,
     label: "模糊半徑",
+    short: "模糊",
     hint: "適合柔化文字、臉部或背景資訊。",
     min: 2,
     max: 40,
     defaultValue: 12,
     suffix: "px",
     buttonLabel: "套用全部模糊",
-    usesStrength: true
+    usesStrength: true,
+    usesColor: false
   },
   blackout: {
     tool: blackoutTool,
     label: "黑條模式",
+    short: "黑條",
     hint: "用實心黑條快速遮住敏感內容。",
     min: 4,
     max: 80,
     defaultValue: 18,
     suffix: "固定",
     buttonLabel: "套用全部黑條",
-    usesStrength: false
+    usesStrength: false,
+    usesColor: false
   },
   cover: {
     tool: coverTool,
     label: "純色遮蓋",
+    short: "純色",
     hint: "自訂顏色覆蓋資訊，適合標註或統一樣式遮蓋。",
     min: 4,
     max: 80,
     defaultValue: 18,
     suffix: "固定",
     buttonLabel: "套用全部純色遮蓋",
-    usesStrength: false
+    usesStrength: false,
+    usesColor: true
+  },
+  box: {
+    tool: boxTool,
+    label: "框線寬度",
+    short: "框線",
+    hint: "在選區畫彩色空心框，中間保持透明——用來圈重點而非遮蔽。",
+    min: 1,
+    max: 30,
+    defaultValue: 6,
+    suffix: "px",
+    buttonLabel: "套用全部框線",
+    usesStrength: true,
+    usesColor: true
+  },
+  highlight: {
+    tool: highlightTool,
+    label: "高亮濃度",
+    short: "高亮",
+    hint: "像螢光筆鋪一層半透明色，強調文字或段落。",
+    min: 10,
+    max: 80,
+    defaultValue: 35,
+    suffix: "%",
+    buttonLabel: "套用全部高亮",
+    usesStrength: true,
+    usesColor: true
+  },
+  spotlight: {
+    tool: spotlightTool,
+    label: "變暗程度",
+    short: "聚光",
+    hint: "把選區以外壓暗，只留選區清晰，把視線引導到重點。",
+    min: 20,
+    max: 90,
+    defaultValue: 60,
+    suffix: "%",
+    buttonLabel: "套用全部聚光",
+    usesStrength: true,
+    usesColor: false
   }
 };
 
@@ -320,7 +381,15 @@ export function createEditorController(elements: EditorElements): void {
   let logoName = "";
   const selectionEffects = new Map<string, ToolId>();
 
-  const TOOL_ORDER: ToolId[] = ["mosaic", "blur", "blackout", "cover"];
+  // Per-tool colour memory. Masking (cover) keeps a dark default; emphasis tools
+  // default to bright colours so they read on any image.
+  const toolColors: Record<string, string> = {
+    cover: settings.coverColor,
+    box: "#ef4444",
+    highlight: "#facc15"
+  };
+
+  const TOOL_ORDER: ToolId[] = ["mosaic", "blur", "blackout", "cover", "box", "highlight", "spotlight"];
   const nextToolId = (current: ToolId): ToolId => {
     const idx = TOOL_ORDER.indexOf(current);
     return TOOL_ORDER[(idx + 1) % TOOL_ORDER.length];
@@ -378,6 +447,32 @@ export function createEditorController(elements: EditorElements): void {
   let annotations: Annotation[] = [];
   let placingAnnotation = false;
 
+  // Emphasis overlays — non-destructive, baked at export like annotations.
+  type Arrow = { id: string; x1: number; y1: number; x2: number; y2: number; color: string };
+  type Callout = {
+    id: string;
+    sx: number;
+    sy: number;
+    sw: number;
+    sh: number;
+    dx: number;
+    dy: number;
+    scale: number;
+    color: string;
+  };
+  let arrows: Arrow[] = [];
+  let callouts: Callout[] = [];
+  let overlayTool: "none" | "arrow" | "callout" = "none";
+  let overlayDraft: { kind: "arrow" | "callout"; x1: number; y1: number; x2: number; y2: number } | null = null;
+
+  const resetOverlayPlacement = () => {
+    overlayTool = "none";
+    overlayDraft = null;
+    elements.canvas.style.cursor = "";
+  };
+
+  const totalOverlays = () => annotations.length + arrows.length + callouts.length;
+
   const resetZoomAndPan = () => {
     zoomLevel = 1;
     panX = 0;
@@ -400,11 +495,8 @@ export function createEditorController(elements: EditorElements): void {
     const next: UiSettings = {
       activeToolId,
       selectionMode,
-      strengthValues: {
-        mosaic: settings.strengthValues.mosaic,
-        blur: settings.strengthValues.blur
-      },
-      coverColor: elements.coverColor.value,
+      strengthValues: { ...settings.strengthValues },
+      coverColor: toolColors.cover ?? elements.coverColor.value,
       brushSize: Number(elements.brushSize.value),
       exportFormat: elements.exportFormat.value as ExportFormat,
       exportQuality: Number(elements.exportQuality.value),
@@ -471,13 +563,19 @@ export function createEditorController(elements: EditorElements): void {
     elements.blurToolButton.classList.toggle("is-active", activeToolId === "blur");
     elements.blackoutToolButton.classList.toggle("is-active", activeToolId === "blackout");
     elements.coverToolButton.classList.toggle("is-active", activeToolId === "cover");
+    elements.boxToolButton.classList.toggle("is-active", activeToolId === "box");
+    elements.highlightToolButton.classList.toggle("is-active", activeToolId === "highlight");
+    elements.spotlightToolButton.classList.toggle("is-active", activeToolId === "spotlight");
     elements.effectStrengthLabel.textContent = config.label;
     elements.applyButtonLabel.textContent = config.buttonLabel;
-    elements.coverColorGroup.hidden = activeToolId !== "cover";
+    elements.coverColorGroup.hidden = !config.usesColor;
+    if (config.usesColor && toolColors[activeToolId]) {
+      elements.coverColor.value = toolColors[activeToolId];
+    }
     elements.effectStrengthGroup.hidden = !config.usesStrength;
 
     if (config.usesStrength) {
-      const strength = settings.strengthValues[activeToolId as "mosaic" | "blur"] ?? config.defaultValue;
+      const strength = settings.strengthValues[activeToolId] ?? config.defaultValue;
       elements.cellSize.disabled = false;
       elements.cellSize.min = String(config.min);
       elements.cellSize.max = String(config.max);
@@ -519,7 +617,7 @@ export function createEditorController(elements: EditorElements): void {
         const label = getSelectionDisplayLabel(selection);
 
         const effectId = getSelectionEffect(selection);
-        const effectLabel = TOOL_CONFIG[effectId].label.replace(/格子|半徑|模式|遮蓋/g, "").trim() || effectId;
+        const effectLabel = TOOL_CONFIG[effectId].short;
         return `
           <div class="selection-item" data-highlight-index="${index}">
             <div>
@@ -617,6 +715,8 @@ export function createEditorController(elements: EditorElements): void {
     elements.applyLogoAllButton.disabled = images.length === 0 || !logoBitmap || isBusy;
     elements.measureXButton.disabled = !logoBitmap || isBusy;
     elements.addAnnotationButton.disabled = !hasImage || isBusy;
+    elements.addArrowButton.disabled = !hasImage || isBusy;
+    elements.addCalloutButton.disabled = !hasImage || isBusy;
     elements.zoomControls.hidden = !hasImage;
     elements.zoomLevelText.textContent = `${Math.round(zoomLevel * 100)}%`;
     elements.zoomInButton.disabled = zoomLevel >= MAX_ZOOM || isBusy;
@@ -825,6 +925,177 @@ export function createEditorController(elements: EditorElements): void {
     void width;
   };
 
+  // --- Emphasis overlays: arrows + local-zoom callouts ---------------------
+
+  const drawArrowPath = (
+    ctx: CanvasRenderingContext2D,
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    color: string,
+    lineWidth: number
+  ) => {
+    const angle = Math.atan2(y2 - y1, x2 - x1);
+    const head = Math.max(lineWidth * 3.2, 10);
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = lineWidth;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    // Shaft stops a little short so the filled head forms a clean point.
+    const shaftX = x2 - Math.cos(angle) * head * 0.6;
+    const shaftY = y2 - Math.sin(angle) * head * 0.6;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(shaftX, shaftY);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - Math.cos(angle - Math.PI / 6) * head, y2 - Math.sin(angle - Math.PI / 6) * head);
+    ctx.lineTo(x2 - Math.cos(angle + Math.PI / 6) * head, y2 - Math.sin(angle + Math.PI / 6) * head);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  };
+
+  const arrowBaseWidth = (referenceHeight: number) => Math.max(3, referenceHeight * 0.006);
+
+  const drawCalloutShape = (
+    ctx: CanvasRenderingContext2D,
+    callout: Callout,
+    toX: (imgX: number) => number,
+    toY: (imgY: number) => number,
+    lineWidth: number,
+    drawMagnified: (dx: number, dy: number, dw: number, dh: number) => void
+  ) => {
+    const sxA = toX(callout.sx);
+    const syA = toY(callout.sy);
+    const swA = toX(callout.sx + callout.sw) - sxA;
+    const shA = toY(callout.sy + callout.sh) - syA;
+    const dxA = toX(callout.dx);
+    const dyA = toY(callout.dy);
+    const dwA = toX(callout.dx + callout.sw * callout.scale) - dxA;
+    const dhA = toY(callout.dy + callout.sh * callout.scale) - dyA;
+
+    ctx.save();
+    // Connector between source and magnified inset (drawn under the boxes).
+    ctx.strokeStyle = callout.color;
+    ctx.globalAlpha = 0.55;
+    ctx.lineWidth = Math.max(1, lineWidth * 0.6);
+    ctx.setLineDash([lineWidth * 2, lineWidth * 2]);
+    ctx.beginPath();
+    ctx.moveTo(sxA + swA / 2, syA + shA / 2);
+    ctx.lineTo(dxA + dwA / 2, dyA + dhA / 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+
+    // Magnified image.
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    drawMagnified(dxA, dyA, dwA, dhA);
+
+    // Inset border + source outline.
+    ctx.strokeStyle = callout.color;
+    ctx.lineWidth = lineWidth;
+    ctx.strokeRect(dxA, dyA, dwA, dhA);
+    ctx.lineWidth = Math.max(1, lineWidth * 0.75);
+    ctx.strokeRect(sxA, syA, swA, shA);
+    ctx.restore();
+  };
+
+  const drawOverlayEmphasisLive = (ctx: CanvasRenderingContext2D, vp: Viewport, bitmap: ImageBitmap) => {
+    const toX = (imgX: number) => imgX * vp.scale + vp.offsetX;
+    const toY = (imgY: number) => imgY * vp.scale + vp.offsetY;
+    const baseWidth = arrowBaseWidth(bitmap.height) * vp.scale;
+
+    for (const callout of callouts) {
+      drawCalloutShape(ctx, callout, toX, toY, baseWidth, (dx, dy, dw, dh) => {
+        ctx.drawImage(bitmap, callout.sx, callout.sy, callout.sw, callout.sh, dx, dy, dw, dh);
+      });
+    }
+    for (const arrow of arrows) {
+      drawArrowPath(ctx, toX(arrow.x1), toY(arrow.y1), toX(arrow.x2), toY(arrow.y2), arrow.color, baseWidth);
+    }
+
+    if (overlayDraft) {
+      const { x1, y1, x2, y2 } = overlayDraft;
+      if (overlayDraft.kind === "arrow") {
+        drawArrowPath(ctx, toX(x1), toY(y1), toX(x2), toY(y2), elements.annotationColor.value, baseWidth);
+      } else {
+        ctx.save();
+        ctx.strokeStyle = elements.annotationColor.value;
+        ctx.setLineDash([baseWidth * 1.5, baseWidth * 1.5]);
+        ctx.lineWidth = baseWidth;
+        const rx = Math.min(toX(x1), toX(x2));
+        const ry = Math.min(toY(y1), toY(y2));
+        ctx.strokeRect(rx, ry, Math.abs(toX(x2) - toX(x1)), Math.abs(toY(y2) - toY(y1)));
+        ctx.restore();
+      }
+    }
+  };
+
+  const bakeEmphasisInto = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
+    const identity = (v: number) => v;
+    const baseWidth = arrowBaseWidth(height);
+    for (const callout of callouts) {
+      drawCalloutShape(ctx, callout, identity, identity, baseWidth, (dx, dy, dw, dh) => {
+        // Magnify straight from the already-drawn base image on the export canvas.
+        ctx.drawImage(ctx.canvas, callout.sx, callout.sy, callout.sw, callout.sh, dx, dy, dw, dh);
+      });
+    }
+    for (const arrow of arrows) {
+      drawArrowPath(ctx, arrow.x1, arrow.y1, arrow.x2, arrow.y2, arrow.color, baseWidth);
+    }
+    void width;
+  };
+
+  const bakeOverlaysInto = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
+    // Callouts read source pixels from the clean base image, so bake them first.
+    bakeEmphasisInto(ctx, width, height);
+    bakeAnnotationsInto(ctx, width, height);
+  };
+
+  const commitOverlayDraft = (
+    draft: { kind: "arrow" | "callout"; x1: number; y1: number; x2: number; y2: number },
+    bitmap: ImageBitmap
+  ) => {
+    const color = elements.annotationColor.value;
+    if (draft.kind === "arrow") {
+      const dist = Math.hypot(draft.x2 - draft.x1, draft.y2 - draft.y1);
+      if (dist < Math.max(8, bitmap.width * 0.01)) {
+        return;
+      }
+      arrows = [
+        ...arrows,
+        { id: crypto.randomUUID(), x1: draft.x1, y1: draft.y1, x2: draft.x2, y2: draft.y2, color }
+      ];
+      return;
+    }
+
+    const sx = Math.min(draft.x1, draft.x2);
+    const sy = Math.min(draft.y1, draft.y2);
+    const sw = Math.abs(draft.x2 - draft.x1);
+    const sh = Math.abs(draft.y2 - draft.y1);
+    if (sw < 8 || sh < 8) {
+      return;
+    }
+    const scale = Number(elements.calloutScale.value) || 2;
+    const gap = Math.max(12, bitmap.width * 0.02);
+    const dw = sw * scale;
+    const dh = sh * scale;
+    let dx = sx + sw + gap;
+    if (dx + dw > bitmap.width) {
+      dx = sx - gap - dw;
+    }
+    dx = Math.max(0, Math.min(Math.max(0, bitmap.width - dw), dx));
+    let dy = sy + sh / 2 - dh / 2;
+    dy = Math.max(0, Math.min(Math.max(0, bitmap.height - dh), dy));
+    callouts = [...callouts, { id: crypto.randomUUID(), sx, sy, sw, sh, dx, dy, scale, color }];
+  };
+
   const drawCompareSplit = (bitmap: ImageBitmap): void => {
     const original = getOriginalBitmap();
     if (!original) {
@@ -948,6 +1219,7 @@ export function createEditorController(elements: EditorElements): void {
         }
       }
 
+      drawOverlayEmphasisLive(context, viewport, bitmap);
       drawAnnotationsOnCanvas(context, viewport, bitmap);
 
       selections.forEach((selection, index) => {
@@ -1040,6 +1312,9 @@ export function createEditorController(elements: EditorElements): void {
     resetZoomAndPan();
     annotations = [];
     placingAnnotation = false;
+    arrows = [];
+    callouts = [];
+    resetOverlayPlacement();
     syncExportName();
     render();
   };
@@ -1190,8 +1465,8 @@ export function createEditorController(elements: EditorElements): void {
         selectionToRects(selection, workingSource.width, workingSource.height)
       );
       const canvas = await applyToolToRegions(tool, workingSource, effectSels, {
-        cellSize: Number(elements.cellSize.value),
-        coverColor: elements.coverColor.value
+        cellSize: settings.strengthValues[effectId] ?? Number(elements.cellSize.value),
+        coverColor: toolColors[effectId] ?? elements.coverColor.value
       }, regions);
       lastResult = canvas;
       if (intermediate) {
@@ -1213,7 +1488,7 @@ export function createEditorController(elements: EditorElements): void {
     }
 
     const applyToAll = elements.applyToAllImagesToggle.checked && images.length > 1;
-    if (applyToAll && !window.confirm(`把目前 ${selections.length} 個選區的遮蔽效果套用到全部 ${images.length} 張圖片同位置？`)) {
+    if (applyToAll && !window.confirm(`把目前 ${selections.length} 個選區的效果套用到全部 ${images.length} 張圖片同位置？`)) {
       return;
     }
 
@@ -1222,14 +1497,14 @@ export function createEditorController(elements: EditorElements): void {
     try {
       if (applyToAll) {
         let processed = 0;
-        setBusy(true, `批次套用遮蔽 (0/${images.length})...`);
+        setBusy(true, `批次套用效果 (0/${images.length})...`);
         for (const entry of images) {
           const bitmap = entry.document.bitmap;
           if (!bitmap) {
             continue;
           }
           processed += 1;
-          setBusy(true, `批次套用遮蔽 (${processed}/${images.length})...`);
+          setBusy(true, `批次套用效果 (${processed}/${images.length})...`);
           const result = await applyEffectsToBitmap(bitmap, selections);
           if (result) {
             await entry.document.replaceWith(result);
@@ -1262,7 +1537,7 @@ export function createEditorController(elements: EditorElements): void {
 
     try {
       setBusy(true, "圖片匯出中...");
-      const blob = await exportBitmap(bitmap, elements.exportFormat.value as ExportFormat, Number(elements.exportQuality.value), getWatermarkConfig(), bakeAnnotationsInto);
+      const blob = await exportBitmap(bitmap, elements.exportFormat.value as ExportFormat, Number(elements.exportQuality.value), getWatermarkConfig(), bakeOverlaysInto);
       downloadBlob(blob, `${sanitizeFileName(elements.exportName.value || getBaseName(activeEntry.name))}.${getFileExtension(elements.exportFormat.value as ExportFormat)}`);
     } catch (error) {
       reportError(error, "下載圖片失敗，請稍後再試。");
@@ -1291,7 +1566,7 @@ export function createEditorController(elements: EditorElements): void {
         processed += 1;
         setBusy(true, `批次 ZIP 產生中 (${processed}/${images.length})...`);
         const format = elements.exportFormat.value as ExportFormat;
-        const blob = await exportBitmap(bitmap, format, Number(elements.exportQuality.value), getWatermarkConfig(), bakeAnnotationsInto);
+        const blob = await exportBitmap(bitmap, format, Number(elements.exportQuality.value), getWatermarkConfig(), bakeOverlaysInto);
         files.push({
           name: `${sanitizeFileName(getBaseName(entry.name))}.${getFileExtension(format)}`,
           data: new Uint8Array(await blob.arrayBuffer())
@@ -1516,6 +1791,21 @@ export function createEditorController(elements: EditorElements): void {
     saveSettings();
     render();
   });
+  elements.boxToolButton.addEventListener("click", () => {
+    activeToolId = "box";
+    saveSettings();
+    render();
+  });
+  elements.highlightToolButton.addEventListener("click", () => {
+    activeToolId = "highlight";
+    saveSettings();
+    render();
+  });
+  elements.spotlightToolButton.addEventListener("click", () => {
+    activeToolId = "spotlight";
+    saveSettings();
+    render();
+  });
 
   elements.rectModeButton.addEventListener("click", () => {
     selectionMode = "rect";
@@ -1545,7 +1835,7 @@ export function createEditorController(elements: EditorElements): void {
   });
 
   elements.cellSize.addEventListener("input", () => {
-    if (activeToolId === "mosaic" || activeToolId === "blur") {
+    if (TOOL_CONFIG[activeToolId].usesStrength) {
       settings.strengthValues[activeToolId] = Number(elements.cellSize.value);
     }
     saveSettings();
@@ -1553,6 +1843,9 @@ export function createEditorController(elements: EditorElements): void {
   });
 
   elements.coverColor.addEventListener("input", () => {
+    if (TOOL_CONFIG[activeToolId].usesColor) {
+      toolColors[activeToolId] = elements.coverColor.value;
+    }
     saveSettings();
     render();
   });
@@ -1950,31 +2243,61 @@ export function createEditorController(elements: EditorElements): void {
   });
 
   const renderAnnotationList = () => {
-    elements.annotationCountHint.textContent = `${annotations.length} 個`;
-    elements.annotationList.hidden = annotations.length === 0;
-    elements.annotationList.innerHTML = annotations
-      .map(
-        (annotation) => `
+    elements.annotationCountHint.textContent = `${totalOverlays()} 個`;
+    const rows: string[] = [];
+    for (const annotation of annotations) {
+      rows.push(`
           <div class="annotation-item">
             <span class="annotation-swatch" style="background:${annotation.color}"></span>
-            <span title="${escapeHtml(annotation.text)}">${escapeHtml(annotation.text)}</span>
+            <span title="${escapeHtml(annotation.text)}">文字：${escapeHtml(annotation.text)}</span>
             <button type="button" class="selection-remove-button" data-annotation-remove="${annotation.id}" aria-label="刪除這條標註" title="刪除">✕</button>
           </div>
-        `
-      )
-      .join("");
+        `);
+    }
+    for (const arrow of arrows) {
+      rows.push(`
+          <div class="annotation-item">
+            <span class="annotation-swatch" style="background:${arrow.color}"></span>
+            <span>箭頭</span>
+            <button type="button" class="selection-remove-button" data-arrow-remove="${arrow.id}" aria-label="刪除這個箭頭" title="刪除">✕</button>
+          </div>
+        `);
+    }
+    for (const callout of callouts) {
+      rows.push(`
+          <div class="annotation-item">
+            <span class="annotation-swatch" style="background:${callout.color}"></span>
+            <span>局部放大 ${callout.scale}×</span>
+            <button type="button" class="selection-remove-button" data-callout-remove="${callout.id}" aria-label="刪除這個放大框" title="刪除">✕</button>
+          </div>
+        `);
+    }
+    elements.annotationList.hidden = rows.length === 0;
+    elements.annotationList.innerHTML = rows.join("");
   };
 
   elements.annotationList.addEventListener("click", (event) => {
     const target = event.target as HTMLElement | null;
-    const btn = target?.closest<HTMLElement>("[data-annotation-remove]");
-    if (!btn) {
+    const annBtn = target?.closest<HTMLElement>("[data-annotation-remove]");
+    if (annBtn) {
+      annotations = annotations.filter((annotation) => annotation.id !== annBtn.dataset.annotationRemove);
+      renderAnnotationList();
+      render();
       return;
     }
-    const id = btn.dataset.annotationRemove;
-    annotations = annotations.filter((annotation) => annotation.id !== id);
-    renderAnnotationList();
-    render();
+    const arrowBtn = target?.closest<HTMLElement>("[data-arrow-remove]");
+    if (arrowBtn) {
+      arrows = arrows.filter((arrow) => arrow.id !== arrowBtn.dataset.arrowRemove);
+      renderAnnotationList();
+      render();
+      return;
+    }
+    const calloutBtn = target?.closest<HTMLElement>("[data-callout-remove]");
+    if (calloutBtn) {
+      callouts = callouts.filter((callout) => callout.id !== calloutBtn.dataset.calloutRemove);
+      renderAnnotationList();
+      render();
+    }
   });
 
   elements.annotationSize.addEventListener("input", () => {
@@ -1985,9 +2308,30 @@ export function createEditorController(elements: EditorElements): void {
     if (!getCurrentBitmap() || isBusy) {
       return;
     }
+    resetOverlayPlacement();
     placingAnnotation = true;
     elements.canvas.style.cursor = "crosshair";
     elements.processingStatus.textContent = "請點圖片上要放文字標註的位置";
+  });
+
+  elements.addArrowButton.addEventListener("click", () => {
+    if (!getCurrentBitmap() || isBusy) {
+      return;
+    }
+    placingAnnotation = false;
+    overlayTool = "arrow";
+    elements.canvas.style.cursor = "crosshair";
+    elements.processingStatus.textContent = "在圖片上拖曳畫箭頭：從尾端拖到要指向的地方";
+  });
+
+  elements.addCalloutButton.addEventListener("click", () => {
+    if (!getCurrentBitmap() || isBusy) {
+      return;
+    }
+    placingAnnotation = false;
+    overlayTool = "callout";
+    elements.canvas.style.cursor = "crosshair";
+    elements.processingStatus.textContent = "拖曳框住要放大的區域，旁邊會自動放上放大版";
   });
 
   window.addEventListener("keydown", (event) => {
@@ -2046,6 +2390,17 @@ export function createEditorController(elements: EditorElements): void {
         renderAnnotationList();
         render();
       }
+      return;
+    }
+
+    if (overlayTool !== "none") {
+      const point = toImagePoint(event, elements.canvas, viewport);
+      const x = Math.max(0, Math.min(bitmap.width, point.x));
+      const y = Math.max(0, Math.min(bitmap.height, point.y));
+      overlayDraft = { kind: overlayTool, x1: x, y1: y, x2: x, y2: y };
+      elements.canvas.setPointerCapture(event.pointerId);
+      event.preventDefault();
+      render();
       return;
     }
 
@@ -2147,6 +2502,16 @@ export function createEditorController(elements: EditorElements): void {
 
     const point = toImagePoint(event, elements.canvas, viewport);
 
+    if (overlayDraft) {
+      overlayDraft = {
+        ...overlayDraft,
+        x2: Math.max(0, Math.min(bitmap.width, point.x)),
+        y2: Math.max(0, Math.min(bitmap.height, point.y))
+      };
+      render();
+      return;
+    }
+
     if (interaction.kind === "moving") {
       const dx = point.x - interaction.pointerStart.x;
       const dy = point.y - interaction.pointerStart.y;
@@ -2219,6 +2584,22 @@ export function createEditorController(elements: EditorElements): void {
       return;
     }
 
+    if (overlayDraft) {
+      const draft = overlayDraft;
+      const bitmap = getDisplayBitmap();
+      if (elements.canvas.hasPointerCapture(event.pointerId)) {
+        elements.canvas.releasePointerCapture(event.pointerId);
+      }
+      if (bitmap) {
+        commitOverlayDraft(draft, bitmap);
+      }
+      resetOverlayPlacement();
+      elements.processingStatus.textContent = "所有處理都在本機瀏覽器完成，不會上傳圖片。";
+      renderAnnotationList();
+      render();
+      return;
+    }
+
     if (interaction.kind === "moving" || interaction.kind === "resizing") {
       interaction = { kind: "idle" };
       if (elements.canvas.hasPointerCapture(event.pointerId)) {
@@ -2246,6 +2627,9 @@ export function createEditorController(elements: EditorElements): void {
     dragStart = null;
     draftSelection = null;
     interaction = { kind: "idle" };
+    if (overlayDraft) {
+      resetOverlayPlacement();
+    }
     render();
   });
 
@@ -2449,7 +2833,7 @@ export function createEditorController(elements: EditorElements): void {
         throw new Error("Canvas not supported");
       }
       ctx.drawImage(bitmap, 0, 0);
-      bakeAnnotationsInto(ctx, canvas.width, canvas.height);
+      bakeOverlaysInto(ctx, canvas.width, canvas.height);
       const watermarkCfg = getWatermarkConfig();
       if (watermarkCfg) {
         drawWatermark(ctx, canvas.width, canvas.height, watermarkCfg.text, watermarkCfg.position);

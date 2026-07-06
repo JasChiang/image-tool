@@ -30,6 +30,9 @@ const mosaicToolButton = document.querySelector<HTMLButtonElement>("#mosaicToolB
 const blurToolButton = document.querySelector<HTMLButtonElement>("#blurToolButton");
 const blackoutToolButton = document.querySelector<HTMLButtonElement>("#blackoutToolButton");
 const coverToolButton = document.querySelector<HTMLButtonElement>("#coverToolButton");
+const boxToolButton = document.querySelector<HTMLButtonElement>("#boxToolButton");
+const highlightToolButton = document.querySelector<HTMLButtonElement>("#highlightToolButton");
+const spotlightToolButton = document.querySelector<HTMLButtonElement>("#spotlightToolButton");
 const effectStrengthLabel = document.querySelector<HTMLLabelElement>("#effectStrengthLabel");
 const cellSize = document.querySelector<HTMLInputElement>("#cellSize");
 const cellSizeValue = document.querySelector<HTMLOutputElement>("#cellSizeValue");
@@ -80,6 +83,9 @@ const annotationColor = document.querySelector<HTMLInputElement>("#annotationCol
 const annotationSize = document.querySelector<HTMLInputElement>("#annotationSize");
 const annotationSizeValue = document.querySelector<HTMLOutputElement>("#annotationSizeValue");
 const addAnnotationButton = document.querySelector<HTMLButtonElement>("#addAnnotationButton");
+const addArrowButton = document.querySelector<HTMLButtonElement>("#addArrowButton");
+const addCalloutButton = document.querySelector<HTMLButtonElement>("#addCalloutButton");
+const calloutScale = document.querySelector<HTMLSelectElement>("#calloutScale");
 const annotationList = document.querySelector<HTMLElement>("#annotationList");
 const annotationCountHint = document.querySelector<HTMLElement>("#annotationCountHint");
 const exportName = document.querySelector<HTMLInputElement>("#exportName");
@@ -198,8 +204,14 @@ if (
   !annotationSize ||
   !annotationSizeValue ||
   !addAnnotationButton ||
+  !addArrowButton ||
+  !addCalloutButton ||
+  !calloutScale ||
   !annotationList ||
   !annotationCountHint ||
+  !boxToolButton ||
+  !highlightToolButton ||
+  !spotlightToolButton ||
   !cellSize ||
   !cellSizeValue ||
   !effectHint ||
@@ -279,6 +291,9 @@ createEditorController({
   blurToolButton,
   blackoutToolButton,
   coverToolButton,
+  boxToolButton,
+  highlightToolButton,
+  spotlightToolButton,
   effectStrengthLabel,
   effectStrengthGroup,
   eyedropperButton,
@@ -324,6 +339,9 @@ createEditorController({
   annotationSize,
   annotationSizeValue,
   addAnnotationButton,
+  addArrowButton,
+  addCalloutButton,
+  calloutScale,
   annotationList,
   annotationCountHint,
   cellSize,

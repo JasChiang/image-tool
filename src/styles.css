@@ -410,8 +410,34 @@ output {
   border-color: #fde68a;
 }
 
+.selection-effect-chip.effect-box {
+  background: #fee2e2;
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+
+.selection-effect-chip.effect-highlight {
+  background: #fef9c3;
+  color: #854d0e;
+  border-color: #fef08a;
+}
+
+.selection-effect-chip.effect-spotlight {
+  background: #cffafe;
+  color: #155e75;
+  border-color: #a5f3fc;
+}
+
 .selection-effect-chip:hover {
   transform: scale(1.05);
+}
+
+.tool-group-label {
+  margin: 10px 0 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--muted, #64748b);
+  letter-spacing: 0.02em;
 }
 
 .logo-upload-button {
