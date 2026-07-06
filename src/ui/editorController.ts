@@ -224,7 +224,7 @@ const DEFAULT_SETTINGS: UiSettings = {
     mosaic: 18,
     blur: 12,
     box: 6,
-    highlight: 35,
+    highlight: 55,
     spotlight: 60
   },
   coverColor: "#111827",
@@ -328,10 +328,10 @@ const TOOL_CONFIG: Record<ToolId, {
     tool: highlightTool,
     label: "高亮濃度",
     short: "高亮",
-    hint: "像螢光筆鋪一層半透明色，強調文字或段落。",
-    min: 10,
-    max: 80,
-    defaultValue: 35,
+    hint: "像螢光筆在選區鋪一層彩色（選區本身變色，不是把周圍變暗）。",
+    min: 20,
+    max: 90,
+    defaultValue: 55,
     suffix: "%",
     buttonLabel: "套用全部高亮",
     usesStrength: true,
@@ -464,6 +464,20 @@ export function createEditorController(elements: EditorElements): void {
   let callouts: Callout[] = [];
   let overlayTool: "none" | "arrow" | "callout" = "none";
   let overlayDraft: { kind: "arrow" | "callout"; x1: number; y1: number; x2: number; y2: number } | null = null;
+  let draggingCallout: { id: string; offX: number; offY: number } | null = null;
+
+  // Topmost callout whose magnified inset contains the point (for dragging).
+  const findCalloutAt = (point: Point): Callout | null => {
+    for (let i = callouts.length - 1; i >= 0; i -= 1) {
+      const c = callouts[i];
+      const dw = c.sw * c.scale;
+      const dh = c.sh * c.scale;
+      if (point.x >= c.dx && point.x <= c.dx + dw && point.y >= c.dy && point.y <= c.dy + dh) {
+        return c;
+      }
+    }
+    return null;
+  };
 
   const resetOverlayPlacement = () => {
     overlayTool = "none";
@@ -534,6 +548,11 @@ export function createEditorController(elements: EditorElements): void {
     clearSelections();
     clearCutLines();
     elements.compareToggle.checked = false;
+    annotations = [];
+    arrows = [];
+    callouts = [];
+    placingAnnotation = false;
+    resetOverlayPlacement();
   };
 
   const setBusy = (busy: boolean, message?: string) => {
@@ -1269,6 +1288,10 @@ export function createEditorController(elements: EditorElements): void {
   const updateHoverCursor = (point: Point) => {
     if (mode !== "edit" || selectionMode === "polygon" || isBusy) {
       elements.canvas.style.cursor = "";
+      return;
+    }
+    if (overlayTool === "none" && findCalloutAt(point)) {
+      elements.canvas.style.cursor = "grab";
       return;
     }
     const handleHit = findHandleAt(point, selections, viewport);
@@ -2331,7 +2354,7 @@ export function createEditorController(elements: EditorElements): void {
     placingAnnotation = false;
     overlayTool = "callout";
     elements.canvas.style.cursor = "crosshair";
-    elements.processingStatus.textContent = "拖曳框住要放大的區域，旁邊會自動放上放大版";
+    elements.processingStatus.textContent = "拖曳框住要放大的區域，旁邊會放上放大版（之後可再拖放大框移動位置）";
   });
 
   window.addEventListener("keydown", (event) => {
@@ -2427,6 +2450,14 @@ export function createEditorController(elements: EditorElements): void {
       return;
     }
 
+    const calloutHit = findCalloutAt(point);
+    if (calloutHit) {
+      draggingCallout = { id: calloutHit.id, offX: point.x - calloutHit.dx, offY: point.y - calloutHit.dy };
+      elements.canvas.setPointerCapture(event.pointerId);
+      elements.canvas.style.cursor = "grabbing";
+      return;
+    }
+
     if (selectionMode === "polygon") {
       activePolygonPoints = [...activePolygonPoints, point];
       render();
@@ -2502,6 +2533,22 @@ export function createEditorController(elements: EditorElements): void {
 
     const point = toImagePoint(event, elements.canvas, viewport);
 
+    if (draggingCallout) {
+      const drag = draggingCallout;
+      callouts = callouts.map((c) => {
+        if (c.id !== drag.id) {
+          return c;
+        }
+        const dw = c.sw * c.scale;
+        const dh = c.sh * c.scale;
+        const dx = Math.max(0, Math.min(Math.max(0, bitmap.width - dw), point.x - drag.offX));
+        const dy = Math.max(0, Math.min(Math.max(0, bitmap.height - dh), point.y - drag.offY));
+        return { ...c, dx, dy };
+      });
+      render();
+      return;
+    }
+
     if (overlayDraft) {
       overlayDraft = {
         ...overlayDraft,
@@ -2562,6 +2609,16 @@ export function createEditorController(elements: EditorElements): void {
 
   elements.canvas.addEventListener("pointerup", (event) => {
     if (isBusy) {
+      return;
+    }
+
+    if (draggingCallout) {
+      draggingCallout = null;
+      if (elements.canvas.hasPointerCapture(event.pointerId)) {
+        elements.canvas.releasePointerCapture(event.pointerId);
+      }
+      elements.canvas.style.cursor = "";
+      render();
       return;
     }
 
@@ -2627,6 +2684,7 @@ export function createEditorController(elements: EditorElements): void {
     dragStart = null;
     draftSelection = null;
     interaction = { kind: "idle" };
+    draggingCallout = null;
     if (overlayDraft) {
       resetOverlayPlacement();
     }
